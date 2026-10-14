@@ -52,6 +52,8 @@ pub struct Runtime {
     show_rulers: Option<bool>,
     /// Tool options as last remembered in the preferences (see `tool_memory`).
     pub(crate) tool_options: Option<crate::state::ToolOptions>,
+    /// AI Integrations settings the agent connection was last set up for (`sync_agent_link`).
+    agent_link: Option<prefs::Integrations>,
 }
 
 /// The GPU canvas colours from Preferences › Transparency & Gamut.
@@ -429,6 +431,7 @@ pub fn tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
     sync_tooltips(app, ctx);
     sync_animations(app, ctx);
     app.sync_recent();
+    sync_agent_link(app, ctx);
     if let Some(wait) = persist(app, ctx.input(|i| i.time)) {
         ctx.request_repaint_after(std::time::Duration::try_from_secs_f64(wait).unwrap_or_default());
     }
@@ -443,6 +446,26 @@ pub fn tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
     #[cfg(not(target_arch = "wasm32"))]
     link_updates(app, ctx);
     history_log(app);
+}
+
+/// Preferences › AI Integrations: start, move or stop the agent connection when its settings
+/// change ([`crate::Services::agent_link`]); the first frame applies the saved settings.
+fn sync_agent_link(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    let Some(link) = app.services.agent_link.as_mut() else { return };
+    let current = &app.session.prefs().integrations;
+    if app.prefs_rt.agent_link.as_ref() == Some(current) {
+        return;
+    }
+    let update = link(current, ctx);
+    app.prefs_rt.agent_link = Some(current.clone());
+    if update.stopped {
+        app.control_rx = None;
+    }
+    if let Some(rx) = update.requests {
+        app.control_rx = Some(rx);
+    }
+    app.services.set_automation(update.automation);
+    app.agent_link = update.status;
 }
 
 /// First retry delay after a failed preferences write, in seconds; it doubles with every further
@@ -1010,8 +1033,13 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
     match f.get("__prefsui").and_then(Value::as_str).unwrap_or("") {
         "prefs" => {
             f.insert("__gpuInfo".into(), json!(app.perf.gpu_info.lines()));
+            f.insert("__agentLink".into(), serde_json::to_value(&app.agent_link).unwrap_or(Value::Null));
+            f.insert("__agentClients".into(), json!(app.services.agent_clients.is_some()));
             let system = system_theme(app, ui.ctx());
             prefs_body(ui, f, system);
+            if let Some(action) = f.remove("__agentAction").and_then(|a| a.as_str().map(str::to_string)) {
+                agent_action(app, ui.ctx(), f, &action);
+            }
         }
         "shortcuts" => shortcuts_body(app, ui, f),
         "presets" => presets_body(app, ui, f),
@@ -1042,6 +1070,14 @@ fn humanize(key: &str) -> String {
     if key == "notificationDurationSeconds" {
         return "Notification Duration (seconds)".into();
     }
+    // AI Integrations: the labels its own rows show (`integration_rows`), also for search.
+    match key {
+        "connectAgents" => return "Let AI agents connect (MCP)".into(),
+        "readFolder" => return "Folder agents can open from".into(),
+        "writeFolder" => return "Folder agents can save to".into(),
+        "whenAppClosed" => return "When PhotoCraft is closed".into(),
+        _ => {}
+    }
     let mut s = String::new();
     for (i, ch) in key.chars().enumerate() {
         if i == 0 {
@@ -1070,6 +1106,10 @@ fn choice_label(v: &str) -> String {
         "metal" => "Metal".into(),
         "gl" => "OpenGL".into(),
         "cpu" => "CPU (no GPU acceleration)".into(),
+        // AI Integrations › When PhotoCraft is closed.
+        "launch" => "Open PhotoCraft".into(),
+        "headless" => "Work without a window".into(),
+        "error" => "Ask to open PhotoCraft".into(),
         v => humanize(v),
     }
 }
@@ -1189,6 +1229,10 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
                 if !has_visible_fields(&values, &section) {
                     ui.add_space(4.0);
                     ui.label(RichText::new(tl!("These settings aren't available in PhotoCraft yet.")).color(t.text_faint));
+                } else if section == "integrations"
+                    && let Some(obj) = values.get_mut(&section).and_then(Value::as_object_mut)
+                {
+                    integration_rows(ui, obj, f);
                 } else if let Some(obj) = values.get_mut(&section).and_then(Value::as_object_mut) {
                     section_fields(ui, &section, obj, &order, lang, system, filter);
                     if section == "fileHandling" {
@@ -1243,6 +1287,118 @@ fn gpu_status_rows(ui: &mut egui::Ui, info: Option<&Value>, obj: &mut Map<String
             obj.insert("gpuBackend".into(), json!(current));
         });
     });
+}
+
+/// Preferences › AI Integrations: whether agents may connect, the folders they may use, what
+/// `photocraft-cli mcp --live` does while the app is closed, and buttons that add PhotoCraft to
+/// MCP clients. A button click is left in `f["__agentAction"]` for [`agent_action`].
+fn integration_rows(ui: &mut egui::Ui, obj: &mut Map<String, Value>, f: &mut Map<String, Value>) {
+    let t = Tokens::get(ui.ctx());
+    let status = f.get("__agentLink").cloned().unwrap_or(Value::Null);
+    let launch_flags = status.get("launchFlags").and_then(Value::as_bool) == Some(true);
+    let mut on = obj.get("connectAgents").and_then(Value::as_bool).unwrap_or(false);
+    let label = humanize("connectAgents");
+    ui.add_enabled_ui(!launch_flags, |ui| crate::widgets::checkbox(ui, &mut on, &label));
+    obj.insert("connectAgents".into(), json!(on));
+    ui.label(
+        RichText::new(tl!("AI apps such as Claude can then open, edit and save documents here. Only programs on this computer can connect.")).color(t.text_dim),
+    );
+    ui.add_space(4.0);
+    let port = status.get("port").and_then(Value::as_u64);
+    let error = status.get("error").and_then(Value::as_str);
+    let (line, color) = match (launch_flags, port, error) {
+        (true, _, _) => (tl!("Managed by the launch options (--control).").to_string(), t.text_dim),
+        (false, _, Some(e)) => (e.to_string(), t.danger),
+        (false, Some(p), None) => (crate::i18n::fmt(tl!("Agents can connect on 127.0.0.1:{port}."), &[("port", &p.to_string())]), t.accent_text),
+        (false, None, None) => (tl!("Off: agents can't connect.").to_string(), t.text_faint),
+    };
+    ui.label(RichText::new(line).color(color));
+    ui.add_space(8.0);
+    egui::Grid::new("prefs-integrations").num_columns(2).spacing([14.0, 7.0]).show(ui, |ui| {
+        ui.label(RichText::new(tl!(&humanize("controlPort"))).color(t.text_dim));
+        ui.horizontal(|ui| {
+            let mut p = obj.get("controlPort").and_then(Value::as_i64).unwrap_or(0);
+            ui.add(egui::DragValue::new(&mut p).range(0..=65535).custom_parser(crate::widgets::parse_num));
+            obj.insert("controlPort".into(), json!(p));
+            ui.label(RichText::new(tl!("0 picks a free port")).color(t.text_faint));
+        });
+        ui.end_row();
+        for (key, pick) in [("readFolder", "chooseRead"), ("writeFolder", "chooseWrite")] {
+            ui.label(RichText::new(tl!(&humanize(key))).color(t.text_dim));
+            ui.horizontal(|ui| {
+                let mut path = obj.get(key).and_then(Value::as_str).unwrap_or("").to_string();
+                crate::widgets::text_field(ui, ui.id().with(key), &mut path, tl!("None"), 260.0, false);
+                obj.insert(key.into(), json!(path));
+                if crate::widgets::secondary_button(ui, tl!("Browse…"), 70.0).clicked() {
+                    f.insert("__agentAction".into(), json!(pick));
+                }
+            });
+            ui.end_row();
+        }
+        ui.label(RichText::new(tl!(&humanize("whenAppClosed"))).color(t.text_dim));
+        let mut cur = obj.get("whenAppClosed").and_then(Value::as_str).unwrap_or("launch").to_string();
+        let options = prefs::choices("integrations.whenAppClosed").unwrap_or(&[]);
+        let labels: Vec<String> = options.iter().map(|o| choice_label(o)).collect();
+        let pairs: Vec<(String, &str)> = options.iter().map(|o| o.to_string()).zip(labels.iter().map(String::as_str)).collect();
+        crate::widgets::dropdown(ui, "pref-integrations.whenAppClosed", &mut cur, &pairs, 220.0);
+        obj.insert("whenAppClosed".into(), json!(cur));
+        ui.end_row();
+    });
+    if f.get("__agentClients").and_then(Value::as_bool) == Some(true) {
+        ui.add_space(10.0);
+        ui.label(RichText::new(tl!("Connect an AI app")).font(crate::theme::semibold(12.5)).color(t.text));
+        ui.horizontal_wrapped(|ui| {
+            for (id, label) in [
+                ("claude-desktop", tl!("Add to Claude Desktop")),
+                ("claude-code", tl!("Add to Claude Code")),
+                ("cursor", tl!("Add to Cursor")),
+                ("json", tl!("Copy Configuration")),
+            ] {
+                if crate::widgets::secondary_button(ui, label, 120.0).clicked() {
+                    f.insert("__agentAction".into(), json!(id));
+                }
+            }
+        });
+    }
+    if let Some(result) = f.get("__agentResult").and_then(Value::as_object) {
+        let ok = result.get("ok").and_then(Value::as_bool) == Some(true);
+        let text = result.get("message").and_then(Value::as_str).unwrap_or("");
+        ui.label(RichText::new(text).color(if ok { t.text_dim } else { t.danger }));
+    }
+}
+
+/// A button of [`integration_rows`]: choose a folder (into the dialog's working copy), or add
+/// PhotoCraft to an MCP client through [`crate::Services::agent_clients`].
+fn agent_action(app: &mut PhotocraftApp, ctx: &egui::Context, f: &mut Map<String, Value>, action: &str) {
+    let key = match action {
+        "chooseRead" => Some("readFolder"),
+        "chooseWrite" => Some("writeFolder"),
+        _ => None,
+    };
+    if let Some(key) = key {
+        let picked = app.ask_folder(move |app, path| {
+            if let Some(d) = app.ui.dialogs.iter_mut().find(|d| is_preferences(&d.fields))
+                && let Some(obj) = d.fields.get_mut("values").and_then(|v| v.get_mut("integrations")).and_then(Value::as_object_mut)
+            {
+                obj.insert(key.into(), json!(path));
+            }
+            Ok(Value::Null)
+        });
+        if let Err(e) = picked {
+            f.insert("__agentResult".into(), json!({"ok": false, "message": e}));
+        }
+        return;
+    }
+    let Some(add) = app.services.agent_clients.as_mut() else { return };
+    let result = match add(action) {
+        Ok(text) if action == "json" => {
+            ctx.copy_text(text);
+            json!({"ok": true, "message": tl!("Configuration copied.")})
+        }
+        Ok(message) => json!({"ok": true, "message": message}),
+        Err(e) => json!({"ok": false, "message": e}),
+    };
+    f.insert("__agentResult".into(), result);
 }
 
 /// One user-facing choice; legacy flags remain compatible with older settings.
@@ -2831,14 +2987,77 @@ mod tests {
     }
 
     #[test]
+    fn ai_integrations_start_and_stop_the_agent_connection_through_the_service() {
+        use std::sync::mpsc::channel;
+        let (mut app, _) = app_with_store();
+        let ctx = egui::Context::default();
+        let calls: Arc<Mutex<Vec<prefs::Integrations>>> = Arc::default();
+        let seen = calls.clone();
+        let (tx, rx) = channel::<crate::ControlRequest>();
+        let mut rx = Some(rx);
+        app.services.agent_link = Some(Box::new(move |p: &prefs::Integrations, _: &egui::Context| {
+            seen.lock().unwrap().push(p.clone());
+            let mut out = crate::AgentLink { stopped: !p.connect_agents, ..Default::default() };
+            if p.connect_agents {
+                out.requests = rx.take();
+                out.status.port = Some(4321);
+                out.automation.command = Some(Box::new(|_, _| Err("policy".into())));
+            }
+            out
+        }));
+        // The first frame applies the saved settings (off), once.
+        tick(&mut app, &ctx);
+        tick(&mut app, &ctx);
+        assert_eq!(calls.lock().unwrap().len(), 1);
+        assert!(app.control_rx.is_none() && app.agent_link.port.is_none());
+        // On: the request channel and the automation policy are installed.
+        app.run("prefs.set", json!({"values": {"integrations.connectAgents": true, "integrations.readFolder": "/work"}})).unwrap();
+        tick(&mut app, &ctx);
+        assert_eq!(calls.lock().unwrap().last().map(|p| (p.connect_agents, p.read_folder.clone())), Some((true, "/work".into())));
+        assert!(app.control_rx.is_some());
+        assert!(app.services.automation_command.is_some());
+        assert_eq!(app.agent_link.port, Some(4321));
+        assert!(tx.send(crate::ControlRequest::new("ui.inspect", json!({})).0).is_ok(), "the app holds the receiver");
+        // An unrelated preference doesn't touch the connection.
+        app.run("prefs.set", json!({"values": {"performance.historyStates": 12}})).unwrap();
+        tick(&mut app, &ctx);
+        assert_eq!(calls.lock().unwrap().len(), 2);
+        // Off: the channel and the policy go.
+        app.run("prefs.set", json!({"values": {"integrations.connectAgents": false}})).unwrap();
+        tick(&mut app, &ctx);
+        assert_eq!(calls.lock().unwrap().len(), 3);
+        assert!(app.control_rx.is_none() && app.services.automation_command.is_none());
+        assert_eq!(app.agent_link.port, None);
+        // ui.inspect reports it.
+        assert!(crate::control::inspect(&app, &ctx).get("agentLink").is_some());
+    }
+
+    #[test]
+    fn ai_integrations_choices_and_paths_validate_through_prefs_set() {
+        let (mut app, _) = app_with_store();
+        for v in ["launch", "headless", "error"] {
+            app.run("prefs.set", json!({"values": {"integrations.whenAppClosed": v}})).unwrap();
+            assert_eq!(app.session.prefs().integrations.when_app_closed.name(), v);
+        }
+        assert!(app.run("prefs.set", json!({"values": {"integrations.whenAppClosed": "sometimes"}})).is_err());
+        assert!(
+            app.run("prefs.set", json!({"values": {"integrations.controlPort": 70000}})).is_err() || app.session.prefs().integrations.control_port <= 65535
+        );
+        app.run("prefs.set", json!({"values": {"integrations.writeFolder": "/tmp/out"}})).unwrap();
+        assert_eq!(app.session.prefs().integrations.write_folder, "/tmp/out");
+    }
+
+    #[test]
     fn unimplemented_preferences_are_hidden_from_the_dialog() {
         let values = prefs::Preferences::default().to_json();
         assert!(has_visible_fields(&values, "general"));
         assert!(has_visible_fields(&values, "fileHandling"));
-        // Every setting of these sections is still unimplemented.
-        for section in ["integrations", "scratchDisks"] {
-            assert!(!has_visible_fields(&values, section), "{section}");
-        }
+        // Every setting of this section is still unimplemented.
+        assert!(!has_visible_fields(&values, "scratchDisks"));
+        // AI Integrations: the agent connection is live; the older Allow Agent Control isn't.
+        assert!(has_visible_fields(&values, "integrations"));
+        assert!(!prefs::is_hidden("integrations.connectAgents"));
+        assert!(prefs::is_hidden("integrations.allowAgentControl"));
         // "Fill new type layers with placeholder text" and "Use Escape to Commit" are live; other Type rows stay hidden.
         assert!(has_visible_fields(&values, "type"));
         assert!(!prefs::is_hidden("type.fillNewTypeLayersWithPlaceholder"));

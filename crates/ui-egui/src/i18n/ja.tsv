@@ -3821,3 +3821,22 @@ curves	Smooth	スムーズ
 	Reset All Locked Settings	ロックされた設定をすべて初期化
 	Copy Texture to Other Tools	テクスチャを他のツールにコピー
 	ICO is limited to 256 × 256 pixels	ICO は 256 × 256 ピクセルまでです
+# Edit › Preferences › AI Integrations
+	Let AI agents connect (MCP)	AI エージェントの接続を許可 (MCP)
+	AI apps such as Claude can then open, edit and save documents here. Only programs on this computer can connect.	Claude などの AI アプリがここでドキュメントを開き、編集し、保存できるようになります。接続できるのはこのコンピューター上のプログラムだけです。
+	Managed by the launch options (--control).	起動オプションで管理されています (--control)。
+	Agents can connect on 127.0.0.1:{port}.	エージェントは 127.0.0.1:{port} で接続できます。
+	Off: agents can't connect.	オフ：エージェントは接続できません。
+	0 picks a free port	0 で空いているポートを選択
+	Folder agents can open from	エージェントが開けるフォルダー
+	Folder agents can save to	エージェントが保存できるフォルダー
+	When PhotoCraft is closed	PhotoCraft が閉じているとき
+	Open PhotoCraft	PhotoCraft を開く
+	Work without a window	ウィンドウなしで作業
+	Ask to open PhotoCraft	PhotoCraft を開くよう求める
+	Connect an AI app	AI アプリを接続
+	Add to Claude Desktop	Claude Desktop に追加
+	Add to Claude Code	Claude Code に追加
+	Add to Cursor	Cursor に追加
+	Copy Configuration	設定をコピー
+	Configuration copied.	設定をコピーしました。

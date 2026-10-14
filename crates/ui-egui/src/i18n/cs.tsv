@@ -3752,3 +3752,22 @@ navigator	Zoom	Zvětšení
 	Sent to {printer}	Odesláno do {printer}
 	set in Print Settings…	nastavuje se v nastavení tisku…
 	ICO is limited to 256 × 256 pixels	ICO je omezen na 256 × 256 pixelů
+# Edit › Preferences › AI Integrations
+	Let AI agents connect (MCP)	Povolit připojení agentů AI (MCP)
+	AI apps such as Claude can then open, edit and save documents here. Only programs on this computer can connect.	Aplikace AI, jako je Claude, pak mohou zde otevírat, upravovat a ukládat dokumenty. Připojit se mohou jen programy na tomto počítači.
+	Managed by the launch options (--control).	Spravováno parametry spuštění (--control).
+	Agents can connect on 127.0.0.1:{port}.	Agenti se mohou připojit na 127.0.0.1:{port}.
+	Off: agents can't connect.	Vypnuto: agenti se nemohou připojit.
+	0 picks a free port	0 zvolí volný port
+	Folder agents can open from	Složka, ze které mohou agenti otevírat
+	Folder agents can save to	Složka, do které mohou agenti ukládat
+	When PhotoCraft is closed	Když je PhotoCraft zavřený
+	Open PhotoCraft	Otevřít PhotoCraft
+	Work without a window	Pracovat bez okna
+	Ask to open PhotoCraft	Požádat o otevření PhotoCraftu
+	Connect an AI app	Připojit aplikaci AI
+	Add to Claude Desktop	Přidat do Claude Desktop
+	Add to Claude Code	Přidat do Claude Code
+	Add to Cursor	Přidat do Cursoru
+	Copy Configuration	Kopírovat konfiguraci
+	Configuration copied.	Konfigurace zkopírována.

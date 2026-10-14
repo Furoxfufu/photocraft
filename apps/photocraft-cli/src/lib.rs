@@ -43,6 +43,13 @@ USAGE:
   photocraft-cli mcp [--bridge <127.0.0.1:port>] [--control-token <64-hex> | --control-token-file <path>]
       [--automation-read-root <dir>] [--automation-write-root <dir>]
       Run the MCP server on stdio (headless engine, or bridge to a running `photocraft --control <port>`).
+  photocraft-cli mcp --live [--when-closed <launch|headless|error>] [--automation-read-root <dir>] [--automation-write-root <dir>]
+      Run the MCP server on stdio for the desktop app with Edit › Preferences › AI Integrations ›
+      Let AI agents connect on, found again on every call (no port or token to configure). While the
+      app is closed, --when-closed (default: the app's When PhotoCraft Is Closed setting) starts it,
+      serves a headless session with the app's agent folders (or the roots given here), or fails.
+  photocraft-cli mcp install --client <claude-desktop|claude-code|cursor|json>
+      Add `photocraft-cli mcp --live` to an MCP client's configuration (json: print it to paste).
   photocraft-cli serve [--port <port>] [--control-token <64-hex> | --control-token-file <path>]
       [--automation-read-root <dir>] [--automation-write-root <dir>]
       Keep one headless session open and answer JSON lines ({\"id\",\"method\",\"params\"}) on stdio,
@@ -87,9 +94,9 @@ const SUBCOMMANDS: &[Subcommand] = &[
     Subcommand { name: "commands", values: &["--filter"], bare: &["--json"], run: |a, out, _| commands(a, out) },
     Subcommand {
         name: "mcp",
-        values: &["--bridge", "--control-token", "--control-token-file", "--automation-read-root", "--automation-write-root"],
-        bare: &[],
-        run: |a, _, _| mcp(a),
+        values: &["--bridge", "--control-token", "--control-token-file", "--automation-read-root", "--automation-write-root", "--when-closed", "--client"],
+        bare: &["--live"],
+        run: mcp,
     },
     Subcommand {
         name: "serve",
@@ -581,8 +588,24 @@ fn serve(a: &Args, err: &mut dyn Write) -> R {
     }
 }
 
-fn mcp(a: &Args) -> R {
+fn mcp(a: &Args, out: &mut dyn Write, _err: &mut dyn Write) -> R {
+    match a.positional.as_slice() {
+        [] => {}
+        [cmd] if cmd == "install" => return mcp_install(a, out),
+        [cmd, ..] => return Err(format!("unknown mcp command `{cmd}` (expected `install` or none)")),
+    }
+    if let Some(flag) = ["--client"].into_iter().find(|f| a.has(f)) {
+        return Err(format!("{flag} goes with `mcp install`"));
+    }
+    let live = a.has("--live");
+    if !live && let Some(flag) = ["--when-closed"].into_iter().find(|f| a.has(f)) {
+        return Err(format!("{flag} goes with --live"));
+    }
+    if live && let Some(flag) = ["--bridge", "--control-token", "--control-token-file"].into_iter().find(|f| a.has(f)) {
+        return Err(format!("--live finds the app by itself; {flag} is for --bridge"));
+    }
     let server = match a.get("--bridge") {
+        _ if live => PhotocraftMcp::live(live_config(a)?),
         Some(addr) => {
             let (supplied, token_file) = security::token_inputs(a.get("--control-token").map(str::to_owned), a.get("--control-token-file").map(PathBuf::from));
             let token = security::client_token(supplied.as_deref(), token_file.as_deref()).map_err(|e| e.to_string())?;
@@ -592,6 +615,42 @@ fn mcp(a: &Args) -> R {
     };
     let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().map_err(|e| e.to_string())?;
     rt.block_on(server.serve_stdio()).map_err(|e| e.to_string())
+}
+
+/// `mcp --live`: the app's settings folder, the closed-app override and the app launcher.
+fn live_config(a: &Args) -> Result<photocraft_automation::live::LiveConfig, String> {
+    let dir = photocraft_automation::app_dirs::from_env().dir.ok_or("can't find PhotoCraft's settings folder (no home folder; set PHOTOCRAFT_CONFIG_DIR)")?;
+    let mut config = photocraft_automation::live::LiveConfig::new(dir);
+    config.when_closed = match a.get("--when-closed") {
+        None => None,
+        Some(v) => {
+            Some(photocraft_engine::prefs::WhenAppClosed::parse(v).ok_or_else(|| format!("bad --when-closed `{v}`: expected launch, headless or error"))?)
+        }
+    };
+    config.read_root = a.get("--automation-read-root").map(PathBuf::from);
+    config.write_root = a.get("--automation-write-root").map(PathBuf::from);
+    config.launch = std::env::current_exe().ok().and_then(|exe| photocraft_automation::live::launcher(&exe));
+    Ok(config)
+}
+
+/// `mcp install --client <id>`: add this CLI (`mcp --live`) to an MCP client.
+fn mcp_install(a: &Args, out: &mut dyn Write) -> R {
+    use photocraft_automation::agent_link::{Client, ClientEnv, McpLaunch, install};
+    if let Some(flag) = a.flags.iter().map(|(f, _)| f.as_str()).find(|f| *f != "--client") {
+        return Err(format!("{flag} doesn't go with `mcp install`"));
+    }
+    let ids = Client::ALL.map(Client::id).join(", ");
+    let id = a.get("--client").ok_or_else(|| format!("mcp install needs --client <{ids}>"))?;
+    let client = Client::parse(id).ok_or_else(|| format!("unknown --client `{id}`: expected one of {ids}"))?;
+    let exe = std::env::current_exe().map_err(|e| format!("can't find this program's path: {e}"))?;
+    let launch = match std::env::var_os("APPIMAGE").filter(|v| !v.is_empty()) {
+        Some(image) => McpLaunch::beside(Path::new(""), Some(Path::new(&image))),
+        // Not canonicalized: Windows would turn it into a `\\?\` path some clients can't start.
+        None => McpLaunch::cli(&exe),
+    };
+    let done = install(client, &launch, &ClientEnv::from_env()).map_err(|e| e.to_string())?;
+    let _ = writeln!(out, "{}", done.message(client));
+    Ok(())
 }
 
 #[cfg(test)]

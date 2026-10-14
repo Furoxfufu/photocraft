@@ -3631,3 +3631,22 @@ curves	Smooth	Làm mượt
 	Sent to {printer}	Đã gửi tới {printer}
 	set in Print Settings…	đặt trong thiết lập in…
 	ICO is limited to 256 × 256 pixels	ICO giới hạn ở 256 × 256 pixel
+# Edit › Preferences › AI Integrations
+	Let AI agents connect (MCP)	Cho phép tác tử AI kết nối (MCP)
+	AI apps such as Claude can then open, edit and save documents here. Only programs on this computer can connect.	Các ứng dụng AI như Claude khi đó có thể mở, chỉnh sửa và lưu tài liệu tại đây. Chỉ các chương trình trên máy tính này mới có thể kết nối.
+	Managed by the launch options (--control).	Do tùy chọn khởi chạy quản lý (--control).
+	Agents can connect on 127.0.0.1:{port}.	Tác tử có thể kết nối tại 127.0.0.1:{port}.
+	Off: agents can't connect.	Tắt: tác tử không thể kết nối.
+	0 picks a free port	0 chọn một cổng trống
+	Folder agents can open from	Thư mục tác tử có thể mở
+	Folder agents can save to	Thư mục tác tử có thể lưu vào
+	When PhotoCraft is closed	Khi PhotoCraft đang đóng
+	Open PhotoCraft	Mở PhotoCraft
+	Work without a window	Làm việc không cần cửa sổ
+	Ask to open PhotoCraft	Yêu cầu mở PhotoCraft
+	Connect an AI app	Kết nối ứng dụng AI
+	Add to Claude Desktop	Thêm vào Claude Desktop
+	Add to Claude Code	Thêm vào Claude Code
+	Add to Cursor	Thêm vào Cursor
+	Copy Configuration	Sao chép cấu hình
+	Configuration copied.	Đã sao chép cấu hình.

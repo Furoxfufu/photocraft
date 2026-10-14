@@ -204,6 +204,7 @@ At startup the desktop lists recovery metadata, then decodes one document at a t
 
 - **Headless:** `photocraft-cli mcp --automation-read-root <dir> --automation-write-root <dir>`. It drives an in-process engine session and has no file authority when a root is omitted.
 - **Live app:** start `photocraft --control 7878 --control-token-file <private-path> --automation-read-root <dir> --automation-write-root <dir>`, then run `photocraft-cli mcp --bridge 127.0.0.1:7878 --control-token-file <private-path>`. The desktop process owns the roots. See `docs/control-protocol.md#mcp-bridge`.
+- **Live app, no flags:** turn on Edit › Preferences › AI Integrations › Let AI agents connect, then point the MCP client at `photocraft-cli mcp --live` (the panel's buttons, or `photocraft-cli mcp install --client <claude-desktop|claude-code|cursor|json>`, do it). The app publishes its port and token file in `agent-connection.json` in the settings folder; `--live` reads it on every call. See [MCP conventions](mcp.md#connecting-the-desktop-app-no-terminal). Test it against a scratch settings folder with `PHOTOCRAFT_CONFIG_DIR`, which both the app and the CLI honour.
 
 For headless MCP clients, pass absolute paths to deliberately chosen trusted workspace directories in the launch arguments. Desktop `PHOTOCRAFT_AUTOMATION_READ_ROOT` and `PHOTOCRAFT_AUTOMATION_WRITE_ROOT` environment variables do **not** grant headless CLI access. Omitting a root flag deliberately denies that direction of access.
 

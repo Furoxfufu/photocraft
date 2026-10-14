@@ -3110,3 +3110,22 @@ curves	Smooth	Сгладить
 	Gray Value (Median)	Уровень серого (медиана)
 	Integrated Density	Интегральная плотность
 	Length	Длина
+# Edit › Preferences › AI Integrations
+	Let AI agents connect (MCP)	Разрешить подключение ИИ-агентов (MCP)
+	AI apps such as Claude can then open, edit and save documents here. Only programs on this computer can connect.	ИИ-приложения, такие как Claude, смогут открывать, редактировать и сохранять здесь документы. Подключаться могут только программы на этом компьютере.
+	Managed by the launch options (--control).	Управляется параметрами запуска (--control).
+	Agents can connect on 127.0.0.1:{port}.	Агенты могут подключаться к 127.0.0.1:{port}.
+	Off: agents can't connect.	Выключено: агенты не могут подключаться.
+	0 picks a free port	0 — выбрать свободный порт
+	Folder agents can open from	Папка, из которой агенты могут открывать
+	Folder agents can save to	Папка, в которую агенты могут сохранять
+	When PhotoCraft is closed	Когда PhotoCraft закрыт
+	Open PhotoCraft	Открыть PhotoCraft
+	Work without a window	Работать без окна
+	Ask to open PhotoCraft	Попросить открыть PhotoCraft
+	Connect an AI app	Подключить ИИ-приложение
+	Add to Claude Desktop	Добавить в Claude Desktop
+	Add to Claude Code	Добавить в Claude Code
+	Add to Cursor	Добавить в Cursor
+	Copy Configuration	Копировать конфигурацию
+	Configuration copied.	Конфигурация скопирована.

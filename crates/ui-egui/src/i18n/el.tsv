@@ -3842,3 +3842,22 @@ curves	Smooth	Εξομάλυνση
 	Sent to {printer}	Στάλθηκε στον {printer}
 	set in Print Settings…	ορίζεται στις ρυθμίσεις εκτύπωσης…
 	ICO is limited to 256 × 256 pixels	Το ICO περιορίζεται σε 256 × 256 εικονοστοιχεία
+# Edit › Preferences › AI Integrations
+	Let AI agents connect (MCP)	Να επιτρέπεται η σύνδεση πρακτόρων AI (MCP)
+	AI apps such as Claude can then open, edit and save documents here. Only programs on this computer can connect.	Εφαρμογές AI όπως το Claude μπορούν τότε να ανοίγουν, να επεξεργάζονται και να αποθηκεύουν έγγραφα εδώ. Μόνο προγράμματα σε αυτόν τον υπολογιστή μπορούν να συνδεθούν.
+	Managed by the launch options (--control).	Διαχειρίζεται από τις επιλογές εκκίνησης (--control).
+	Agents can connect on 127.0.0.1:{port}.	Οι πράκτορες μπορούν να συνδεθούν στο 127.0.0.1:{port}.
+	Off: agents can't connect.	Ανενεργό: οι πράκτορες δεν μπορούν να συνδεθούν.
+	0 picks a free port	Το 0 επιλέγει μια ελεύθερη θύρα
+	Folder agents can open from	Φάκελος από τον οποίο ανοίγουν οι πράκτορες
+	Folder agents can save to	Φάκελος όπου αποθηκεύουν οι πράκτορες
+	When PhotoCraft is closed	Όταν το PhotoCraft είναι κλειστό
+	Open PhotoCraft	Άνοιγμα του PhotoCraft
+	Work without a window	Εργασία χωρίς παράθυρο
+	Ask to open PhotoCraft	Αίτημα για άνοιγμα του PhotoCraft
+	Connect an AI app	Σύνδεση εφαρμογής AI
+	Add to Claude Desktop	Προσθήκη στο Claude Desktop
+	Add to Claude Code	Προσθήκη στο Claude Code
+	Add to Cursor	Προσθήκη στο Cursor
+	Copy Configuration	Αντιγραφή ρυθμίσεων
+	Configuration copied.	Οι ρυθμίσεις αντιγράφηκαν.

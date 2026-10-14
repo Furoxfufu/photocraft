@@ -1,44 +1,14 @@
 //! Where the desktop app keeps its per-user data: preferences, brush presets, crash-recovery
 //! autosaves and the GPU startup marker all live under the one directory [`config_dir`] returns.
 //!
-//! In order:
-//! 1. `PHOTOCRAFT_CONFIG_DIR`, when set (tests, agents, custom setups).
-//! 2. **Portable mode** (#228): a marker file ([`PORTABLE_MARKERS`]) beside the executable puts
-//!    everything in `<exe dir>/PhotoCraftData`, so a portable copy on a USB stick leaves nothing in
-//!    `%APPDATA%`. The Windows portable zip ships with `portable.txt`; the MSI doesn't. If that
-//!    folder can't be written (read-only medium, Program Files), the app warns and falls back.
-//! 3. The platform convention: macOS `~/Library/Application Support/Photocraft`, Windows
-//!    `%APPDATA%\Photocraft`, Linux `$XDG_CONFIG_HOME/photocraft` or `~/.config/photocraft`.
+//! The rules (`PHOTOCRAFT_CONFIG_DIR`, portable mode, the platform convention) live in
+//! [`photocraft_automation::app_dirs`], so `photocraft-cli` resolves the same folder; this module
+//! resolves it once for the app and logs the outcome.
 
-use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-/// Files beside the executable that switch on portable mode (either one; contents are ignored).
-pub const PORTABLE_MARKERS: [&str; 2] = ["portable.txt", "PhotoCraft.portable"];
-/// The data folder created beside the executable in portable mode.
-pub const PORTABLE_DATA_DIR: &str = "PhotoCraftData";
-
-/// How [`DataDir::dir`] was chosen.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Mode {
-    /// `PHOTOCRAFT_CONFIG_DIR`.
-    Override,
-    /// `<exe dir>/PhotoCraftData`.
-    Portable,
-    /// The platform's per-user config directory.
-    Platform,
-}
-
-/// The resolved data directory.
-#[derive(Clone, Debug)]
-pub struct DataDir {
-    /// `None` only when no platform directory is known either (no `HOME`/`APPDATA`).
-    pub dir: Option<PathBuf>,
-    pub mode: Mode,
-    /// Set when a portable marker was found but its data folder isn't writable.
-    pub warning: Option<String>,
-}
+pub use photocraft_automation::app_dirs::{DataDir, resolve};
 
 /// The data directory for this process, resolved once (the portable check probes the disk).
 pub fn current() -> &'static DataDir {
@@ -60,58 +30,12 @@ pub fn config_dir() -> Option<PathBuf> {
     current().dir.clone()
 }
 
-/// Resolve the data directory from the environment (`env`) and the executable's folder.
-pub fn resolve(env: impl Fn(&str) -> Option<OsString>, exe_dir: Option<&Path>) -> DataDir {
-    if let Some(d) = env("PHOTOCRAFT_CONFIG_DIR").filter(|d| !d.is_empty()) {
-        return DataDir { dir: Some(PathBuf::from(d)), mode: Mode::Override, warning: None };
-    }
-    let platform = platform_dir(&env);
-    let Some((exe_dir, marker)) = exe_dir.and_then(|d| portable_marker(d).map(|m| (d, m))) else {
-        return DataDir { dir: platform, mode: Mode::Platform, warning: None };
-    };
-    let data = exe_dir.join(PORTABLE_DATA_DIR);
-    match ensure_writable(&data) {
-        Ok(()) => DataDir { dir: Some(data), mode: Mode::Portable, warning: None },
-        Err(e) => {
-            let fallback = platform.as_ref().map_or_else(|| "nowhere (no user folder found)".to_string(), |p| p.display().to_string());
-            let warning =
-                format!("portable mode ({} found) but {} isn't writable ({e}); settings are kept in {fallback} instead", marker.display(), data.display());
-            DataDir { dir: platform, mode: Mode::Platform, warning: Some(warning) }
-        }
-    }
-}
-
-/// The platform convention, from `env` (so tests can fake `HOME`/`APPDATA`/`XDG_CONFIG_HOME`).
-pub fn platform_dir(env: &impl Fn(&str) -> Option<OsString>) -> Option<PathBuf> {
-    let home = env("HOME").filter(|h| !h.is_empty()).map(PathBuf::from);
-    if cfg!(target_os = "macos") {
-        return home.map(|h| h.join("Library/Application Support/Photocraft"));
-    }
-    if cfg!(windows) {
-        return env("APPDATA").filter(|a| !a.is_empty()).map(|a| PathBuf::from(a).join("Photocraft"));
-    }
-    env("XDG_CONFIG_HOME").filter(|x| !x.is_empty()).map(PathBuf::from).or_else(|| home.map(|h| h.join(".config"))).map(|c| c.join("photocraft"))
-}
-
-/// The first portable marker file in `exe_dir`, if any.
-pub fn portable_marker(exe_dir: &Path) -> Option<PathBuf> {
-    PORTABLE_MARKERS.iter().map(|m| exe_dir.join(m)).find(|p| p.is_file())
-}
-
-/// Create `dir` and prove a file can be written in it (a folder can exist yet be read-only).
-fn ensure_writable(dir: &Path) -> std::io::Result<()> {
-    std::fs::create_dir_all(dir)?;
-    let probe = dir.join(format!(".write-test-{}", std::process::id()));
-    std::fs::write(&probe, b"")?;
-    // A leftover probe is harmless; don't fail portable mode over it.
-    let _ = std::fs::remove_file(&probe);
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use photocraft_automation::app_dirs::{Mode, PORTABLE_DATA_DIR, PORTABLE_MARKERS, platform_dir};
     use std::collections::HashMap;
+    use std::ffi::OsString;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     fn temp(tag: &str) -> PathBuf {

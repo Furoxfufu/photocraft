@@ -16,6 +16,7 @@ use serde_json::{Value, json};
 use crate::bridge::BridgeClient;
 use crate::budgets::{BatchReplyBudget, MAX_PREVIEW_SIDE, check_png, json_bytes};
 use crate::headless::Headless;
+use crate::live::{Live, LiveConfig, Target};
 use crate::security::MAX_BATCH_STEPS;
 use crate::{AuthorizedWorkspace, AutomationError, files};
 
@@ -25,6 +26,9 @@ pub enum Backend {
     Headless(Arc<Mutex<Headless>>),
     /// A running desktop app reached over the control protocol.
     Bridge(Arc<BridgeClient>),
+    /// The desktop app found through its connection file before each call, or the closed-app
+    /// choice (`photocraft-cli mcp --live`, see [`crate::live`]).
+    Live(Arc<Live>),
 }
 
 #[derive(Clone)]
@@ -465,6 +469,11 @@ impl PhotocraftMcp {
         Ok(Self::with_backend(Backend::Bridge(Arc::new(BridgeClient::new(addr, token)?))))
     }
 
+    /// Serve the desktop app found through its connection file (`photocraft-cli mcp --live`).
+    pub fn live(config: LiveConfig) -> Self {
+        Self::with_backend(Backend::Live(Arc::new(Live::new(config))))
+    }
+
     pub fn with_backend(backend: Backend) -> Self {
         let mut tool_router = Self::tool_router();
         for route in tool_router.map.values_mut() {
@@ -485,10 +494,7 @@ impl PhotocraftMcp {
         &self,
         f: impl FnOnce(&mut Headless) -> Result<T, AutomationError> + Send + 'static,
     ) -> Option<Result<T, AutomationError>> {
-        let Backend::Headless(h) = &*self.backend else {
-            return None;
-        };
-        let h = h.clone();
+        let h = self.headless_session()?;
         Some(
             tokio::task::spawn_blocking(move || {
                 // A panicking command poisons the lock, but edits run on a copy
@@ -503,10 +509,35 @@ impl PhotocraftMcp {
         )
     }
 
-    fn bridge_client(&self) -> Option<&BridgeClient> {
+    /// The headless session tools run on, if this backend (or `--live`'s choice) is one.
+    fn headless_session(&self) -> Option<Arc<Mutex<Headless>>> {
         match &*self.backend {
-            Backend::Bridge(b) => Some(b),
+            Backend::Headless(h) => Some(h.clone()),
+            Backend::Live(live) => match live.current()? {
+                Target::Headless(h) => Some(h),
+                Target::Bridge(_) => None,
+            },
+            Backend::Bridge(_) => None,
+        }
+    }
+
+    fn bridge_client(&self) -> Option<Arc<BridgeClient>> {
+        match &*self.backend {
+            Backend::Bridge(b) => Some(b.clone()),
+            Backend::Live(live) => match live.current()? {
+                Target::Bridge(b) => Some(b),
+                Target::Headless(_) => None,
+            },
             Backend::Headless(_) => None,
+        }
+    }
+
+    /// `--live`: find the app (or apply the closed-app choice) before a call; the error is the
+    /// call's result. Other backends are always ready.
+    async fn ready(&self) -> Result<(), String> {
+        match &*self.backend {
+            Backend::Live(live) => live.resolve().await,
+            Backend::Headless(_) | Backend::Bridge(_) => Ok(()),
         }
     }
 
@@ -772,7 +803,7 @@ impl PhotocraftMcp {
         if p.index.is_some() {
             return Ok(fail("`index` is only supported in headless mode; bridge previews capture the app window"));
         }
-        self.screenshot(b, Some(max)).await
+        self.screenshot(&b, Some(max)).await
     }
 
     #[tool(description = "Render a bounded flattened PNG preview (bridge mode: app window screenshot).")]
@@ -907,7 +938,7 @@ impl PhotocraftMcp {
     #[tool(description = "Bridge mode: screenshot of the live app window as PNG.")]
     async fn ui_screenshot(&self, Parameters(p): Parameters<ScreenshotParams>) -> Result<CallToolResult, McpError> {
         match self.bridge_client() {
-            Some(b) => self.screenshot(b, p.max_side).await,
+            Some(b) => self.screenshot(&b, p.max_side).await,
             None => bridge_only("ui_screenshot"),
         }
     }

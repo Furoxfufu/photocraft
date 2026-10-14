@@ -3133,3 +3133,22 @@ curves	Smooth	Haluskan
 	Sent to {printer}	Dikirim ke {printer}
 	set in Print Settings…	diatur di Pengaturan Cetak…
 	ICO is limited to 256 × 256 pixels	ICO dibatasi hingga 256 × 256 piksel
+# Edit › Preferences › AI Integrations
+	Let AI agents connect (MCP)	Izinkan agen AI terhubung (MCP)
+	AI apps such as Claude can then open, edit and save documents here. Only programs on this computer can connect.	Aplikasi AI seperti Claude kemudian dapat membuka, mengedit, dan menyimpan dokumen di sini. Hanya program di komputer ini yang dapat terhubung.
+	Managed by the launch options (--control).	Dikelola oleh opsi peluncuran (--control).
+	Agents can connect on 127.0.0.1:{port}.	Agen dapat terhubung di 127.0.0.1:{port}.
+	Off: agents can't connect.	Mati: agen tidak dapat terhubung.
+	0 picks a free port	0 memilih port yang bebas
+	Folder agents can open from	Folder tempat agen dapat membuka
+	Folder agents can save to	Folder tempat agen dapat menyimpan
+	When PhotoCraft is closed	Saat PhotoCraft ditutup
+	Open PhotoCraft	Buka PhotoCraft
+	Work without a window	Bekerja tanpa jendela
+	Ask to open PhotoCraft	Minta untuk membuka PhotoCraft
+	Connect an AI app	Hubungkan aplikasi AI
+	Add to Claude Desktop	Tambahkan ke Claude Desktop
+	Add to Claude Code	Tambahkan ke Claude Code
+	Add to Cursor	Tambahkan ke Cursor
+	Copy Configuration	Salin Konfigurasi
+	Configuration copied.	Konfigurasi disalin.

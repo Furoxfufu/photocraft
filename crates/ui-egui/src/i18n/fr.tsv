@@ -3146,3 +3146,22 @@ curves	Smooth	Lisser
 	Sent to {printer}	Envoyé à {printer}
 	set in Print Settings…	défini dans les paramètres d’impression…
 	ICO is limited to 256 × 256 pixels	Le format ICO est limité à 256 × 256 pixels
+# Edit › Preferences › AI Integrations
+	Let AI agents connect (MCP)	Autoriser la connexion des agents IA (MCP)
+	AI apps such as Claude can then open, edit and save documents here. Only programs on this computer can connect.	Les applications d’IA comme Claude peuvent alors ouvrir, modifier et enregistrer des documents ici. Seuls les programmes de cet ordinateur peuvent se connecter.
+	Managed by the launch options (--control).	Géré par les options de lancement (--control).
+	Agents can connect on 127.0.0.1:{port}.	Les agents peuvent se connecter sur 127.0.0.1:{port}.
+	Off: agents can't connect.	Désactivé : les agents ne peuvent pas se connecter.
+	0 picks a free port	0 choisit un port libre
+	Folder agents can open from	Dossier où les agents peuvent ouvrir
+	Folder agents can save to	Dossier où les agents peuvent enregistrer
+	When PhotoCraft is closed	Quand PhotoCraft est fermé
+	Open PhotoCraft	Ouvrir PhotoCraft
+	Work without a window	Travailler sans fenêtre
+	Ask to open PhotoCraft	Demander d’ouvrir PhotoCraft
+	Connect an AI app	Connecter une application d’IA
+	Add to Claude Desktop	Ajouter à Claude Desktop
+	Add to Claude Code	Ajouter à Claude Code
+	Add to Cursor	Ajouter à Cursor
+	Copy Configuration	Copier la configuration
+	Configuration copied.	Configuration copiée.

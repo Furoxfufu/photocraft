@@ -1,5 +1,36 @@
 # MCP conventions
 
+## Connecting the desktop app (no terminal)
+
+1. In PhotoCraft, open **Edit › Preferences › AI Integrations** and turn on **Let AI agents
+   connect (MCP)**. Optionally choose the folders agents can open from and save to, and what
+   happens when an agent needs PhotoCraft while it is closed (open it, work without a window,
+   or ask the user to open it). Click **Apply** or **OK**.
+2. Click **Add to Claude Desktop**, **Add to Claude Code** or **Add to Cursor** (or **Copy
+   Configuration** for any other MCP client), then restart that client.
+
+The client then starts `photocraft-cli mcp --live`. The app listens on loopback (any free
+port by default) with a token it creates in its settings folder, and publishes both in
+`agent-connection.json` there; `--live` reads that file before every tool call, so the client
+configuration holds no port or token and keeps working when PhotoCraft restarts. The token is
+replaced each time the connection starts. Started with `--control`, the app ignores these
+settings and the launch flags manage the connection, as before.
+
+From a terminal, `photocraft-cli mcp install --client <claude-desktop|claude-code|cursor|json>`
+does what the buttons do. `--when-closed <launch|headless|error>` on `mcp --live` overrides the
+app's choice. In a headless session started that way, the folders chosen in the app (or
+`--automation-read-root` / `--automation-write-root` given to `mcp --live`) are the roots, and the
+session stays headless until the MCP client restarts it. The app is started only on a tool
+call, never when the MCP client starts, and only while **Let AI agents connect** is on.
+
+Claude Desktop's configuration is rewritten with its keys sorted; the previous file is kept beside
+it as `claude_desktop_config.json.photocraft-backup` (likewise Cursor's `mcp.json`). Claude Code
+is configured with `claude mcp add-json --scope user`. In the Flatpak, the sandbox can't write
+those files (use **Copy Configuration**), and the connection needs
+`flatpak override --user --share=network ai.storyteller.photocraft`.
+
+## Headless sessions
+
 PhotoCraft follows the same conventions as FilmCraft #28. Start a headless session:
 
 ```sh

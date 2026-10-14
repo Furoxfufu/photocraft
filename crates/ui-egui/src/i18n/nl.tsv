@@ -3904,3 +3904,22 @@ curves	Smooth	Vloeiend maken
 	Sent to {printer}	Verzonden naar {printer}
 	set in Print Settings…	instellen in de afdrukinstellingen…
 	ICO is limited to 256 × 256 pixels	ICO is beperkt tot 256 × 256 pixels
+# Edit › Preferences › AI Integrations
+	Let AI agents connect (MCP)	AI-agents laten verbinden (MCP)
+	AI apps such as Claude can then open, edit and save documents here. Only programs on this computer can connect.	AI-apps zoals Claude kunnen dan hier documenten openen, bewerken en opslaan. Alleen programma’s op deze computer kunnen verbinden.
+	Managed by the launch options (--control).	Beheerd door de startopties (--control).
+	Agents can connect on 127.0.0.1:{port}.	Agents kunnen verbinden via 127.0.0.1:{port}.
+	Off: agents can't connect.	Uit: agents kunnen niet verbinden.
+	0 picks a free port	0 kiest een vrije poort
+	Folder agents can open from	Map waaruit agents mogen openen
+	Folder agents can save to	Map waarin agents mogen opslaan
+	When PhotoCraft is closed	Als PhotoCraft gesloten is
+	Open PhotoCraft	PhotoCraft openen
+	Work without a window	Zonder venster werken
+	Ask to open PhotoCraft	Vragen om PhotoCraft te openen
+	Connect an AI app	Een AI-app verbinden
+	Add to Claude Desktop	Toevoegen aan Claude Desktop
+	Add to Claude Code	Toevoegen aan Claude Code
+	Add to Cursor	Toevoegen aan Cursor
+	Copy Configuration	Configuratie kopiëren
+	Configuration copied.	Configuratie gekopieerd.

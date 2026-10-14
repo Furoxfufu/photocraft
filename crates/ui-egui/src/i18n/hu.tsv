@@ -4065,3 +4065,22 @@ cameraRaw	Yellow	Sárga
 	Ink Characteristics	Festék jellemzői
 	Solidity:	Fedőképesség:
 	Redrawing	Újrarajzolás
+# Edit › Preferences › AI Integrations
+	Let AI agents connect (MCP)	AI-ügynökök csatlakozásának engedélyezése (MCP)
+	AI apps such as Claude can then open, edit and save documents here. Only programs on this computer can connect.	Az AI-alkalmazások, például a Claude, ezután itt megnyithatnak, szerkeszthetnek és menthetnek dokumentumokat. Csak az ezen a számítógépen futó programok csatlakozhatnak.
+	Managed by the launch options (--control).	Az indítási kapcsolók kezelik (--control).
+	Agents can connect on 127.0.0.1:{port}.	Az ügynökök a 127.0.0.1:{port} címen csatlakozhatnak.
+	Off: agents can't connect.	Ki: az ügynökök nem csatlakozhatnak.
+	0 picks a free port	0: szabad port választása
+	Folder agents can open from	Mappa, ahonnan az ügynökök megnyithatnak
+	Folder agents can save to	Mappa, ahová az ügynökök menthetnek
+	When PhotoCraft is closed	Ha a PhotoCraft be van zárva
+	Open PhotoCraft	PhotoCraft megnyitása
+	Work without a window	Munka ablak nélkül
+	Ask to open PhotoCraft	Kérés a PhotoCraft megnyitására
+	Connect an AI app	AI-alkalmazás csatlakoztatása
+	Add to Claude Desktop	Hozzáadás a Claude Desktophoz
+	Add to Claude Code	Hozzáadás a Claude Code-hoz
+	Add to Cursor	Hozzáadás a Cursorhoz
+	Copy Configuration	Konfiguráció másolása
+	Configuration copied.	Konfiguráció másolva.

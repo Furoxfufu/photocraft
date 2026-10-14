@@ -20,6 +20,7 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
+mod agent_link;
 mod app_dirs;
 mod app_icon;
 mod appearance;
@@ -467,9 +468,18 @@ fn main() -> eframe::Result {
                     log::warn!("couldn't remember GPU backend {}: {e}", b.name());
                 }
             });
+            // Preferences › AI Integrations: agents connect without a terminal, unless the launch
+            // flags (`--control`) manage the connection.
+            let mcp = agent_link::mcp_launch();
+            app.agent_link.mcp_command = mcp.as_ref().map(photocraft_automation::agent_link::McpLaunch::shell_line);
+            app.services.agent_clients = Some(agent_link::clients(mcp.clone()));
             if let Some((port, token, _)) = control {
+                app.agent_link.launch_flags = true;
+                app.agent_link.port = Some(port).filter(|p| *p != 0);
                 let rx = control_server::start(port, token, cc.egui_ctx.clone());
                 app = app.with_control(rx);
+            } else {
+                app.services.agent_link = Some(agent_link::service(services::config_dir(), mcp));
             }
             #[cfg(target_os = "macos")]
             {

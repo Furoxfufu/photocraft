@@ -22,6 +22,8 @@ mkdir -p "$APPDIR/usr/share/icons"
 cp -R "$ROOT/assets/app-icon/hicolor" "$APPDIR/usr/share/icons/"
 printf '#!/bin/sh\necho "stub: $*"\n' >"$APPDIR/usr/bin/photocraft"
 chmod +x "$APPDIR/usr/bin/photocraft"
+printf '#!/bin/sh\necho "cli stub: $*"\n' >"$APPDIR/usr/bin/photocraft-cli"
+chmod +x "$APPDIR/usr/bin/photocraft-cli"
 
 APPIMAGE="$TMP/photocraft test.AppImage" # spaces on purpose: Exec must stay quoted
 : >"$APPIMAGE"
@@ -112,5 +114,11 @@ odd="$TMP/odd\$(id).AppImage"
 out="$(APPIMAGE="$odd" "$APPDIR/AppRun" x)" || fail "launch with an odd path exited non-zero"
 [ "$out" = "stub: x" ] || fail "odd path: $out"
 [ ! -e "$XDG_DATA_HOME" ] || fail "integrated an AppImage path that needs escaping"
+
+# 12. `--cli` runs the bundled CLI (MCP clients start `--cli mcp --live`), without integrating.
+rm -rf "$XDG_DATA_HOME"
+out="$("$APPDIR/AppRun" --cli mcp --live)" || fail "--cli exited non-zero"
+[ "$out" = "cli stub: mcp --live" ] || fail "--cli output: $out"
+[ ! -e "$XDG_DATA_HOME" ] || fail "--cli integrated the desktop entry"
 
 echo "AppRun desktop integration ok"

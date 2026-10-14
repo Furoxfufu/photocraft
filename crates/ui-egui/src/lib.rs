@@ -336,6 +336,53 @@ pub type AutomationWriteFn = Box<dyn FnMut(&str, &[u8]) -> Result<(), String>>;
 pub type AutomationOpenPcraftFn = Box<dyn FnMut(&str) -> Result<Option<(String, Document)>, String>>;
 /// Reject engine commands which still perform ambient filesystem I/O.
 pub type AutomationCommandFn = Box<dyn Fn(&str, &Value) -> Result<(), String>>;
+/// Same policy as [`AutomationCommandFn`] for each step a command runs (`actions.play`).
+pub type AutomationAuthorizeFn = fn(&str, &Value) -> photocraft_engine::Result<()>;
+
+/// The automation half of [`Services`]: what control and MCP requests may read, write and run.
+/// Replaced as a whole when Preferences › AI Integrations starts the agent connection or
+/// changes its folders ([`Services::set_automation`]).
+#[derive(Default)]
+pub struct AutomationServices {
+    pub read: Option<AutomationReadFn>,
+    pub write: Option<AutomationWriteFn>,
+    pub open_pcraft: Option<AutomationOpenPcraftFn>,
+    pub save: Option<SaveFileFn>,
+    pub command: Option<AutomationCommandFn>,
+    pub authorize: Option<AutomationAuthorizeFn>,
+}
+
+/// Preferences › AI Integrations: the agent connection as the dialog and `ui.inspect` show it.
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentLinkStatus {
+    /// Loopback port agents reach the app on, while it accepts them.
+    pub port: Option<u16>,
+    /// Started with `--control`: the launch flags manage the connection, not Preferences.
+    pub launch_flags: bool,
+    /// Why the connection, or one of its folders, couldn't be set up.
+    pub error: Option<String>,
+    /// How an MCP client starts PhotoCraft's MCP server (`photocraft-cli mcp --live`).
+    pub mcp_command: Option<String>,
+}
+
+/// What [`Services::agent_link`] did after the AI Integrations settings changed.
+#[derive(Default)]
+pub struct AgentLink {
+    /// Requests from agents on a connection that just started (or moved to another port).
+    pub requests: Option<Receiver<ControlRequest>>,
+    /// The connection stopped: drop the request channel.
+    pub stopped: bool,
+    /// What agent requests may read, write and run now.
+    pub automation: AutomationServices,
+    pub status: AgentLinkStatus,
+}
+
+/// Starts, moves or stops the agent connection to match Preferences › AI Integrations.
+pub type AgentLinkFn = Box<dyn FnMut(&photocraft_engine::prefs::Integrations, &egui::Context) -> AgentLink>;
+/// Adds PhotoCraft to an MCP client (`claude-desktop`, `claude-code`, `cursor`), returning what
+/// was done, or returns the configuration to paste into any client (`json`).
+pub type AgentClientFn = Box<dyn FnMut(&str) -> Result<String, String>>;
 /// Open a URL in the system browser (native) — reliable cross-platform, unlike `ctx.open_url`.
 pub type OpenUrlFn = Box<dyn Fn(&str) -> Result<(), String>>;
 pub type EncodePngFn = Box<dyn Fn(u32, u32, &[u8]) -> Result<Vec<u8>, String>>;
@@ -422,7 +469,12 @@ pub struct Services {
     /// Same policy as [`Self::automation_command`], as a function pointer the engine calls for
     /// each step of `actions.play`. Installed on the session only while a control request or
     /// an automation-driven [`PhotocraftApp::run`] runs, so a local play of a recorded `file.*` step still works.
-    pub automation_authorize: Option<fn(&str, &serde_json::Value) -> photocraft_engine::Result<()>>,
+    pub automation_authorize: Option<AutomationAuthorizeFn>,
+    /// Preferences › AI Integrations (desktop): starts, moves or stops the agent connection when
+    /// its settings change. `None` on the web, and when `--control` manages the connection.
+    pub agent_link: Option<AgentLinkFn>,
+    /// Preferences › AI Integrations' buttons that add PhotoCraft to MCP clients (desktop).
+    pub agent_clients: Option<AgentClientFn>,
     /// Encode an RGBA8 image as PNG (used for screenshots and `ui.render`).
     pub encode_png: Option<EncodePngFn>,
     /// Open a URL in the system browser (native). Falls back to `ctx.open_url` (web) when unset.
@@ -486,6 +538,18 @@ pub struct Services {
     /// while AppKit's run loop is still going crashes or hangs Touch Bar Macs (#1575, #1458).
     /// Without one, eframe closes the window and the app ends with it.
     pub quit: Option<QuitFn>,
+}
+
+impl Services {
+    /// Install the automation services (see [`AutomationServices`]).
+    pub fn set_automation(&mut self, a: AutomationServices) {
+        self.automation_read = a.read;
+        self.automation_write = a.write;
+        self.automation_open_pcraft = a.open_pcraft;
+        self.automation_save = a.save;
+        self.automation_command = a.command;
+        self.automation_authorize = a.authorize;
+    }
 }
 
 /// A document histogram being computed off the UI thread: (document, revision, receiver of
@@ -578,6 +642,8 @@ pub struct PhotocraftApp {
     /// The first digit of a two-digit opacity typed on the number keys (`opacity_keys`, #352).
     pub(crate) opacity_keys: opacity_keys::Pending,
     control_rx: Option<Receiver<ControlRequest>>,
+    /// Preferences › AI Integrations: the agent connection's state (see [`Services::agent_link`]).
+    pub agent_link: AgentLinkStatus,
     pending_screenshots: Vec<(u64, Option<String>, Sender<ControlResponse>)>,
     /// Screenshots not yet requested from the viewport: (token, earliest time in ms, frames seen).
     queued_screenshots: Vec<(u64, f64, u32)>,
@@ -805,6 +871,7 @@ impl PhotocraftApp {
             caps_lock: false,
             opacity_keys: None,
             control_rx: None,
+            agent_link: AgentLinkStatus::default(),
             pending_screenshots: Vec::new(),
             queued_screenshots: Vec::new(),
             input_waiters: Vec::new(),

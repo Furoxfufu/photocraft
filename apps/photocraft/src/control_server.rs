@@ -1,11 +1,15 @@
 //! Localhost JSON-lines control server (one request per line, one reply per line).
 //! Loopback only. This is the transport the MCP server will wrap.
+//!
+//! `--control` starts it for the whole run ([`start`]); Preferences › AI Integrations starts and
+//! stops it while the app runs ([`listen`], see `agent_link`).
 
 use std::io::{BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender, channel};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use photocraft_automation::budgets::write_reply;
 use photocraft_automation::security::{
@@ -16,19 +20,51 @@ use photocraft_ui_egui::control::REPLY_DEADLINE;
 use serde_json::{Value, json};
 
 pub fn start(port: u16, token: String, ctx: egui::Context) -> Receiver<ControlRequest> {
-    let (tx, rx) = channel::<ControlRequest>();
-    let listener = match TcpListener::bind(("127.0.0.1", port)) {
-        Ok(l) => l,
+    match listen(port, token, ctx) {
+        Ok((rx, server)) => {
+            eprintln!("photocraft: control server listening on 127.0.0.1:{}", server.port);
+            // Serves for the whole run.
+            std::mem::forget(server);
+            rx
+        }
         Err(e) => {
             eprintln!("photocraft: control server failed to bind 127.0.0.1:{port}: {e}");
-            return rx;
+            channel::<ControlRequest>().1
         }
-    };
-    eprintln!("photocraft: control server listening on 127.0.0.1:{port}");
-    std::thread::spawn(move || {
+    }
+}
+
+/// A control server started by [`listen`]. Dropping it stops accepting connections; connections
+/// already open end at their next request, once the app drops the request channel.
+pub struct Listening {
+    /// The bound port (the one the system picked for port 0).
+    pub port: u16,
+    stop: Arc<AtomicBool>,
+}
+
+impl Drop for Listening {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Release);
+        // Wake the accept loop so it sees the flag and closes the listener.
+        let _ = TcpStream::connect_timeout(&std::net::SocketAddr::from(([127, 0, 0, 1], self.port)), Duration::from_millis(500));
+    }
+}
+
+/// Serve the control protocol on `127.0.0.1:port` (0 = any free port) until the returned
+/// [`Listening`] is dropped.
+pub fn listen(port: u16, token: String, ctx: egui::Context) -> std::io::Result<(Receiver<ControlRequest>, Listening)> {
+    let (tx, rx) = channel::<ControlRequest>();
+    let listener = TcpListener::bind(("127.0.0.1", port))?;
+    let port = listener.local_addr()?.port();
+    let stop = Arc::new(AtomicBool::new(false));
+    let stopped = stop.clone();
+    std::thread::Builder::new().name("control server".into()).spawn(move || {
         let limiter = ConnectionLimiter::new(MAX_CONNECTIONS);
         let token = Arc::new(token);
         for mut stream in listener.incoming().flatten() {
+            if stopped.load(Ordering::Acquire) {
+                break;
+            }
             let Some(permit) = limiter.try_acquire() else {
                 let _ = configure_stream(&stream);
                 let _ = writeln!(stream, "{}", json!({"id": null, "ok": false, "error": "connection limit reached"}));
@@ -42,8 +78,8 @@ pub fn start(port: u16, token: String, ctx: egui::Context) -> Receiver<ControlRe
                 serve(stream, &token, tx, ctx);
             });
         }
-    });
-    rx
+    })?;
+    Ok((rx, Listening { port, stop }))
 }
 
 fn serve(stream: TcpStream, token: &str, tx: Sender<ControlRequest>, ctx: egui::Context) {
@@ -208,6 +244,38 @@ mod tests {
         drop(stream);
         handler.join().unwrap();
         server.join().unwrap();
+    }
+
+    #[test]
+    fn a_listening_server_picks_a_port_and_stops_when_dropped() {
+        const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        let (rx, server) = listen(0, TOKEN.into(), egui::Context::default()).unwrap();
+        let port = server.port;
+        assert_ne!(port, 0);
+        let handler = std::thread::spawn(move || {
+            let req = rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            assert_eq!(req.method, "test.ping");
+            req.reply.send(json!({"ok": true, "result": "pong"})).unwrap();
+        });
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        let mut reader = BufReader::new(stream.try_clone().unwrap());
+        let mut line = String::new();
+        writeln!(stream, "{}", json!({"id": 1, "method": "auth", "params": {"token": TOKEN}})).unwrap();
+        reader.read_line(&mut line).unwrap();
+        assert_eq!(serde_json::from_str::<Value>(&line).unwrap()["ok"], true);
+        writeln!(stream, "{}", json!({"id": 2, "method": "test.ping"})).unwrap();
+        line.clear();
+        reader.read_line(&mut line).unwrap();
+        assert_eq!(serde_json::from_str::<Value>(&line).unwrap()["result"], "pong");
+        handler.join().unwrap();
+        drop(server);
+        // The listener closes once the accept loop has seen the stop flag.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while TcpStream::connect_timeout(&std::net::SocketAddr::from(([127, 0, 0, 1], port)), Duration::from_millis(200)).is_ok() {
+            assert!(Instant::now() < deadline, "port {port} still accepts connections after stop");
+            std::thread::sleep(Duration::from_millis(20));
+        }
     }
 
     #[test]

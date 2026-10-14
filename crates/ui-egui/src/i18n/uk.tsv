@@ -3843,3 +3843,22 @@ curves	Smooth	Згладити
 	Sent to {printer}	Надіслано на {printer}
 	set in Print Settings…	задається в параметрах друку…
 	ICO is limited to 256 × 256 pixels	ICO обмежено розміром 256 × 256 пікселів
+# Edit › Preferences › AI Integrations
+	Let AI agents connect (MCP)	Дозволити підключення ШІ-агентів (MCP)
+	AI apps such as Claude can then open, edit and save documents here. Only programs on this computer can connect.	ШІ-застосунки, як-от Claude, зможуть відкривати, редагувати й зберігати тут документи. Підключатися можуть лише програми на цьому комп’ютері.
+	Managed by the launch options (--control).	Керується параметрами запуску (--control).
+	Agents can connect on 127.0.0.1:{port}.	Агенти можуть підключатися до 127.0.0.1:{port}.
+	Off: agents can't connect.	Вимкнено: агенти не можуть підключатися.
+	0 picks a free port	0 — вибрати вільний порт
+	Folder agents can open from	Тека, з якої агенти можуть відкривати
+	Folder agents can save to	Тека, до якої агенти можуть зберігати
+	When PhotoCraft is closed	Коли PhotoCraft закрито
+	Open PhotoCraft	Відкрити PhotoCraft
+	Work without a window	Працювати без вікна
+	Ask to open PhotoCraft	Попросити відкрити PhotoCraft
+	Connect an AI app	Підключити ШІ-застосунок
+	Add to Claude Desktop	Додати до Claude Desktop
+	Add to Claude Code	Додати до Claude Code
+	Add to Cursor	Додати до Cursor
+	Copy Configuration	Копіювати конфігурацію
+	Configuration copied.	Конфігурацію скопійовано.

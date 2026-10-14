@@ -748,3 +748,85 @@ fn batch_plays_a_photoshop_actions_file() {
     assert!(err.contains("Generative Fill"), "{err}");
     assert!(!o.status.success());
 }
+
+/// `mcp install --client json` prints the configuration MCP clients start `mcp --live` with;
+/// Cursor's file gets the same entry, other servers kept (Preferences › AI Integrations).
+#[test]
+fn mcp_install_writes_the_live_entry() {
+    let home = tmp("mcp-install");
+    let (out, _) = ok(bin().args(["mcp", "install", "--client", "json"]).env("HOME", &home));
+    let v: Value = serde_json::from_str(&out).unwrap();
+    let entry = &v["mcpServers"]["photocraft"];
+    assert_eq!(entry["args"], json!(["mcp", "--live"]), "{out}");
+    assert!(entry["command"].as_str().unwrap().contains("photocraft-cli"), "{out}");
+    let cursor = home.join(".cursor/mcp.json");
+    std::fs::create_dir_all(cursor.parent().unwrap()).unwrap();
+    std::fs::write(&cursor, r#"{"mcpServers": {"other": {"command": "x"}}}"#).unwrap();
+    let (out, _) = ok(bin().args(["mcp", "install", "--client", "cursor"]).env("HOME", &home).env("USERPROFILE", &home));
+    assert!(out.contains("Cursor"), "{out}");
+    let v: Value = serde_json::from_str(&std::fs::read_to_string(&cursor).unwrap()).unwrap();
+    assert_eq!(v["mcpServers"]["other"]["command"], "x");
+    assert_eq!(v["mcpServers"]["photocraft"], *entry);
+}
+
+/// Flags that don't go together are refused before anything starts.
+#[test]
+fn mcp_live_and_install_reject_mismatched_flags() {
+    for (args, needle) in [
+        (&["mcp", "install"][..], "--client"),
+        (&["mcp", "install", "--client", "vscode"], "unknown --client"),
+        (&["mcp", "install", "--client", "json", "--live"], "doesn't go with"),
+        (&["mcp", "frob"], "unknown mcp command"),
+        (&["mcp", "--client", "json"], "mcp install"),
+        (&["mcp", "--when-closed", "launch"], "--live"),
+        (&["mcp", "--live", "--bridge", "127.0.0.1:1"], "--bridge"),
+        (&["mcp", "--live", "--when-closed", "sometimes"], "bad --when-closed"),
+    ] {
+        let o = bin().args(args).stdin(Stdio::null()).output().unwrap();
+        let err = String::from_utf8_lossy(&o.stderr);
+        assert!(!o.status.success(), "{args:?} succeeded");
+        assert!(err.contains(needle), "{args:?}: {err}");
+    }
+}
+
+/// `mcp --live` serves MCP without the app; a tool call says how to connect it.
+#[test]
+fn mcp_live_without_the_app_explains_what_to_do() {
+    let dir = tmp("mcp-live");
+    let mut child = bin()
+        .args(["mcp", "--live", "--when-closed", "error"])
+        .env("PHOTOCRAFT_CONFIG_DIR", &dir)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    let mut stdin = child.stdin.take().unwrap();
+    let mut stdout = BufReader::new(child.stdout.take().unwrap());
+    let mut send = |v: Value| {
+        writeln!(stdin, "{v}").unwrap();
+        stdin.flush().unwrap();
+    };
+    let mut recv = |id: u64| -> Value {
+        loop {
+            let mut line = String::new();
+            assert!(stdout.read_line(&mut line).unwrap() > 0, "server closed");
+            let v: Value = serde_json::from_str(&line).unwrap();
+            if v["id"] == id {
+                return v;
+            }
+        }
+    };
+    send(json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{
+        "protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"0"}}}));
+    recv(1);
+    send(json!({"jsonrpc":"2.0","method":"notifications/initialized"}));
+    send(json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ui_inspect","arguments":{}}}));
+    let r = recv(2);
+    assert_eq!(r["result"]["isError"], true, "{r}");
+    assert!(r["result"]["content"][0]["text"].as_str().unwrap().contains("AI Integrations"), "{r}");
+    drop(stdin);
+    let _ = child.kill();
+    let _ = child.wait();
+    let _ = std::fs::remove_dir_all(&dir);
+}

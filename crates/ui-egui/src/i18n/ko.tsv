@@ -3319,3 +3319,22 @@ curves	Smooth	매끄럽게
 	Sent to {printer}	{printer}(으)로 전송됨
 	set in Print Settings…	인쇄 설정에서 지정…
 	ICO is limited to 256 × 256 pixels	ICO는 256 × 256픽셀로 제한됩니다
+# Edit › Preferences › AI Integrations
+	Let AI agents connect (MCP)	AI 에이전트 연결 허용 (MCP)
+	AI apps such as Claude can then open, edit and save documents here. Only programs on this computer can connect.	Claude 같은 AI 앱이 여기에서 문서를 열고 편집하고 저장할 수 있습니다. 이 컴퓨터의 프로그램만 연결할 수 있습니다.
+	Managed by the launch options (--control).	실행 옵션으로 관리됨 (--control).
+	Agents can connect on 127.0.0.1:{port}.	에이전트가 127.0.0.1:{port}에서 연결할 수 있습니다.
+	Off: agents can't connect.	끔: 에이전트가 연결할 수 없습니다.
+	0 picks a free port	0은 빈 포트를 선택
+	Folder agents can open from	에이전트가 열 수 있는 폴더
+	Folder agents can save to	에이전트가 저장할 수 있는 폴더
+	When PhotoCraft is closed	PhotoCraft가 닫혀 있을 때
+	Open PhotoCraft	PhotoCraft 열기
+	Work without a window	창 없이 작업
+	Ask to open PhotoCraft	PhotoCraft 열기 요청
+	Connect an AI app	AI 앱 연결
+	Add to Claude Desktop	Claude Desktop에 추가
+	Add to Claude Code	Claude Code에 추가
+	Add to Cursor	Cursor에 추가
+	Copy Configuration	구성 복사
+	Configuration copied.	구성을 복사했습니다.

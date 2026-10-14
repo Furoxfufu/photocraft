@@ -4219,3 +4219,22 @@ shape	Appearance	Izgled
 	Ink Characteristics	Karakteristike mastila
 	Solidity:	Punoća:
 	Redrawing	Ponovno iscrtavanje
+# Edit › Preferences › AI Integrations
+	Let AI agents connect (MCP)	Dozvoli povezivanje AI agenata (MCP)
+	AI apps such as Claude can then open, edit and save documents here. Only programs on this computer can connect.	AI aplikacije kao što je Claude tada mogu ovde da otvaraju, uređuju i čuvaju dokumente. Mogu da se povežu samo programi na ovom računaru.
+	Managed by the launch options (--control).	Upravljaju opcije pokretanja (--control).
+	Agents can connect on 127.0.0.1:{port}.	Agenti mogu da se povežu na 127.0.0.1:{port}.
+	Off: agents can't connect.	Isključeno: agenti ne mogu da se povežu.
+	0 picks a free port	0 bira slobodan port
+	Folder agents can open from	Fascikla iz koje agenti mogu da otvaraju
+	Folder agents can save to	Fascikla u koju agenti mogu da čuvaju
+	When PhotoCraft is closed	Kada je PhotoCraft zatvoren
+	Open PhotoCraft	Otvori PhotoCraft
+	Work without a window	Radi bez prozora
+	Ask to open PhotoCraft	Zatraži otvaranje PhotoCraft-a
+	Connect an AI app	Poveži AI aplikaciju
+	Add to Claude Desktop	Dodaj u Claude Desktop
+	Add to Claude Code	Dodaj u Claude Code
+	Add to Cursor	Dodaj u Cursor
+	Copy Configuration	Kopiraj konfiguraciju
+	Configuration copied.	Konfiguracija je kopirana.

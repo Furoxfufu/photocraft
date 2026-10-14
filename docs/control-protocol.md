@@ -283,6 +283,10 @@ magenta alignment lines. `ui.pointer` drives the same code, so agents get identi
 - **Headless** (`photocraft-cli mcp`): an in-process `photocraft_engine::Session`. There is no window.
 - **Bridge** (`photocraft-cli mcp --bridge 127.0.0.1:7878 --control-token-file <path>`): every tool is forwarded to a running `photocraft --control 7878 --control-token-file <path>` over this protocol, so agents see and drive the live app.
 
+- **Live** (`photocraft-cli mcp --live`): the bridge, with the address and token read before every tool call from `agent-connection.json` in the app's settings folder. The app publishes that file while Edit › Preferences › AI Integrations › *Let AI agents connect* is on (not with `--control`), and removes it when the connection stops; a file left by a crash fails the connection probe and counts as no app. See [MCP conventions](mcp.md#connecting-the-desktop-app-no-terminal).
+
+`ui.inspect` reports the connection as `agentLink`: `port` while agents can connect, `launchFlags` when `--control` manages it, `error`, and `mcpCommand` (how MCP clients start the CLI).
+
 The bridge keeps one authenticated TCP connection open, and drops and reconnects before a call once the connection has been idle long enough that the app (which closes idle connections after 30s) may have dropped it. A transport failure while sending a request or waiting for its reply, including a reply timeout, drops the connection and reports that the operation may have completed; inspect the document before retrying an edit. Edits are never automatically resent (#1007); a connection that could not be established is reported as "the request was not sent" instead. The MCP server opts its pure-read tools (`ui_inspect`, `doc_inspect`, `command_list`, `jobs_list`, `session_list`, `ui_screenshot`) into one automatic retry on a fresh connection, since a read applies nothing; clients driving `BridgeClient` directly opt in per call with `call_read`. The next separate call reconnects and authenticates, and reply lines whose `id` does not match the request are skipped. The client's call timeout is 55s, strictly below the server's 60s reply deadline, so the bridge's error is the one callers see; commands that can run longer should pass `"wait": false` and poll `jobs.list`. It only accepts loopback addresses, because the app only listens on loopback. Supply its bearer token with `--control-token-file`, `--control-token`, `PHOTOCRAFT_CONTROL_TOKEN_FILE`, or `PHOTOCRAFT_CONTROL_TOKEN`:
 
 ```sh
@@ -329,7 +333,9 @@ Filesystem access fails closed unless launch-time read and/or write roots are gr
 (`PHOTOCRAFT_AUTOMATION_READ_ROOT` / `PHOTOCRAFT_AUTOMATION_WRITE_ROOT`) are supported by
 the desktop `photocraft` process, but not by headless `photocraft-cli mcp` or `serve`;
 for those CLI modes, supply the flags explicitly. In MCP bridge mode, configure roots on the
-desktop process rather than on the bridging CLI. Request paths must be
+desktop process rather than on the bridging CLI. With *Let AI agents connect*, the roots are the
+folders chosen in Preferences › AI Integrations; `mcp --live` uses them for a headless session only
+when the app's *When PhotoCraft is closed* choice (or `--when-closed headless`) asks for one. Request paths must be
 non-empty, forward-slash relative paths beneath the applicable root, or absolute paths that lie
 beneath it. An absolute path is compared with the root as text and the rest is checked like a
 relative path; nothing is resolved on the filesystem. Absolute paths outside the root, parent

@@ -2739,3 +2739,22 @@ curves	Smooth	平滑
 	Sent to {printer}	已傳送至 {printer}
 	set in Print Settings…	在列印設定中設定…
 	ICO is limited to 256 × 256 pixels	ICO 最大為 256 × 256 像素
+# Edit › Preferences › AI Integrations
+	Let AI agents connect (MCP)	允許 AI 代理程式連線 (MCP)
+	AI apps such as Claude can then open, edit and save documents here. Only programs on this computer can connect.	之後，Claude 等 AI 應用程式可以在這裡開啟、編輯和儲存文件。只有這台電腦上的程式可以連線。
+	Managed by the launch options (--control).	由啟動選項管理 (--control)。
+	Agents can connect on 127.0.0.1:{port}.	代理程式可透過 127.0.0.1:{port} 連線。
+	Off: agents can't connect.	關閉：代理程式無法連線。
+	0 picks a free port	0 表示選擇閒置連接埠
+	Folder agents can open from	代理程式可開啟的資料夾
+	Folder agents can save to	代理程式可儲存的資料夾
+	When PhotoCraft is closed	PhotoCraft 關閉時
+	Open PhotoCraft	開啟 PhotoCraft
+	Work without a window	不開視窗工作
+	Ask to open PhotoCraft	要求開啟 PhotoCraft
+	Connect an AI app	連線 AI 應用程式
+	Add to Claude Desktop	加入 Claude Desktop
+	Add to Claude Code	加入 Claude Code
+	Add to Cursor	加入 Cursor
+	Copy Configuration	複製設定
+	Configuration copied.	已複製設定。

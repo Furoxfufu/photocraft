@@ -3876,3 +3876,22 @@ cameraData	Lens	Lens
 	Ink Characteristics	Mürekkep Özellikleri
 	Solidity:	Doluluk:
 	Redrawing	Yeniden çiziliyor
+# Edit › Preferences › AI Integrations
+	Let AI agents connect (MCP)	Yapay zekâ ajanlarının bağlanmasına izin ver (MCP)
+	AI apps such as Claude can then open, edit and save documents here. Only programs on this computer can connect.	Claude gibi yapay zekâ uygulamaları burada belge açabilir, düzenleyebilir ve kaydedebilir. Yalnızca bu bilgisayardaki programlar bağlanabilir.
+	Managed by the launch options (--control).	Başlatma seçenekleri tarafından yönetiliyor (--control).
+	Agents can connect on 127.0.0.1:{port}.	Ajanlar 127.0.0.1:{port} üzerinden bağlanabilir.
+	Off: agents can't connect.	Kapalı: ajanlar bağlanamaz.
+	0 picks a free port	0 boş bir bağlantı noktası seçer
+	Folder agents can open from	Ajanların açabileceği klasör
+	Folder agents can save to	Ajanların kaydedebileceği klasör
+	When PhotoCraft is closed	PhotoCraft kapalıyken
+	Open PhotoCraft	PhotoCraft’ı aç
+	Work without a window	Pencere olmadan çalış
+	Ask to open PhotoCraft	PhotoCraft’ı açmayı iste
+	Connect an AI app	Bir yapay zekâ uygulaması bağla
+	Add to Claude Desktop	Claude Desktop’a ekle
+	Add to Claude Code	Claude Code’a ekle
+	Add to Cursor	Cursor’a ekle
+	Copy Configuration	Yapılandırmayı kopyala
+	Configuration copied.	Yapılandırma kopyalandı.

@@ -108,6 +108,11 @@ choice!(FontPreview { Off = "off", Small = "small", Medium = "medium", Large = "
 choice!(RawColorSpace { Srgb = "srgb", AdobeRgb = "adobeRgb", ProPhoto = "proPhoto", DisplayP3 = "displayP3" } default AdobeRgb);
 choice!(RawDepth { Eight = "8", Sixteen = "16" } default Sixteen);
 choice!(RawSharpen { None = "none", Screen = "screen", Glossy = "glossy", Matte = "matte" } default None);
+choice!(
+    /// AI Integrations › When PhotoCraft Is Closed: what `photocraft-cli mcp --live` does when an
+    /// agent calls a tool and the app isn't running.
+    WhenAppClosed { Launch = "launch", Headless = "headless", Error = "error" } default Launch
+);
 
 impl Unit {
     /// Document pixels → this unit. `dpi` is the document resolution, `extent` the 100% length
@@ -935,13 +940,29 @@ impl Default for RawDefaults {
 pub struct Integrations {
     /// Allow agents to drive the app over the loopback control channel / MCP bridge.
     pub allow_agent_control: bool,
-    /// Default control port (0 = only when `--control` is given).
+    /// Let AI agents connect: the desktop app listens on loopback for `photocraft-cli mcp --live`
+    /// without `--control` (off by default; launch flags still win).
+    pub connect_agents: bool,
+    /// Port agents connect to (0 = any free port, published in the connection file).
     pub control_port: u32,
+    /// Folder agents may open files from (empty = none).
+    pub read_folder: String,
+    /// Folder agents may save files to (empty = none).
+    pub write_folder: String,
+    /// What `photocraft-cli mcp --live` does while the app is closed.
+    pub when_app_closed: WhenAppClosed,
 }
 
 impl Default for Integrations {
     fn default() -> Self {
-        Self { allow_agent_control: true, control_port: 0 }
+        Self {
+            allow_agent_control: true,
+            connect_agents: false,
+            control_port: 0,
+            read_folder: String::new(),
+            write_folder: String::new(),
+            when_app_closed: WhenAppClosed::Launch,
+        }
     }
 }
 
@@ -1077,10 +1098,8 @@ pub const HIDDEN_UNTIL_IMPLEMENTED: &[&str] = &[
     "rawDefaults.sharpenFor",
     "rawDefaults.openAsSmartObject",
     "rawDefaults.applyAutoTone",
-    // Agent access is governed by the launch flags (`--control`, the automation roots), not
-    // by these yet.
+    // Agent access is governed by `integrations.connectAgents` and the launch flags.
     "integrations.allowAgentControl",
-    "integrations.controlPort",
 ];
 
 /// Is the preference at `path` (`"section.key"`) hidden from the Preferences dialog?
@@ -1128,6 +1147,7 @@ pub fn choices(path: &str) -> Option<&'static [&'static str]> {
         "performance.gpuBackend" => GpuBackend::NAMES,
         "performance.linuxDisplayServer" => LinuxDisplayServer::NAMES,
         "performance.renderingMode" => RenderingMode::NAMES,
+        "integrations.whenAppClosed" => WhenAppClosed::NAMES,
         _ => return None,
     })
 }
