@@ -3148,7 +3148,7 @@ curves	Smooth	Glätten
 	Managed by the launch options (--control).	Von den Startoptionen verwaltet (--control).
 	Agents can connect on 127.0.0.1:{port}.	Agenten können sich über 127.0.0.1:{port} verbinden.
 	Off: agents can't connect.	Aus: Agenten können sich nicht verbinden.
-	0 picks a free port	0 wählt einen freien Port
+	0 picks a free port; AI apps find it by themselves	0 wählt einen freien Port; KI-Apps finden ihn selbst
 	Folder agents can open from	Ordner, aus dem Agenten öffnen dürfen
 	Folder agents can save to	Ordner, in den Agenten speichern dürfen
 	When PhotoCraft is closed	Wenn PhotoCraft geschlossen ist

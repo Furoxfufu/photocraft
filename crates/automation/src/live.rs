@@ -189,7 +189,14 @@ pub fn launcher(cli: &Path) -> Option<LaunchFn> {
                 if !app.is_file() {
                     return None;
                 }
-                Command::new(app)
+                if cfg!(windows) {
+                    let (program, args) = windows_launch(&app, std::env::var_os("SystemRoot").as_deref());
+                    let mut c = Command::new(program);
+                    c.args(args);
+                    c
+                } else {
+                    Command::new(app)
+                }
             }
         }
     };
@@ -200,6 +207,21 @@ pub fn launcher(cli: &Path) -> Option<LaunchFn> {
         detach(&mut c);
         c.spawn().map(|_| ()).map_err(|e| e.to_string())
     }))
+}
+
+/// How Windows starts the app at `app`: through Explorer, as a double-click would. The app is then
+/// no child of the CLI, so it outlives the MCP client ending the CLI's process tree (Claude Code
+/// does on Windows), and it runs outside the container of a Microsoft Store client (Claude
+/// Desktop): there, new files under `%APPDATA%` land in the client's package, where the app
+/// started from the Start menu would never see the settings saved meanwhile. Explorer reads a
+/// comma as a separator, so such a path is started directly. (`%WINDIR%` can be empty under a
+/// Store client, hence `%SystemRoot%`.)
+fn windows_launch(app: &Path, system_root: Option<&std::ffi::OsStr>) -> (PathBuf, Vec<std::ffi::OsString>) {
+    if app.to_string_lossy().contains(',') {
+        return (app.to_path_buf(), Vec::new());
+    }
+    let root = system_root.filter(|r| !r.is_empty()).map_or_else(|| PathBuf::from(r"C:\Windows"), PathBuf::from);
+    (root.join("explorer.exe"), vec![app.as_os_str().to_os_string()])
 }
 
 /// Keep the app running when the MCP client stops the CLI (and its process group).
@@ -218,4 +240,25 @@ fn detach(c: &mut std::process::Command) {
     }
     #[cfg(not(any(unix, windows)))]
     let _ = c;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::OsStr;
+
+    #[test]
+    fn windows_starts_the_app_through_explorer() {
+        let app = Path::new(r"C:\Program Files\PhotoCraft\photocraft.exe");
+        let (program, args) = windows_launch(app, Some(OsStr::new(r"D:\Win")));
+        assert_eq!(program, Path::new(r"D:\Win").join("explorer.exe"));
+        assert_eq!(args, [app.as_os_str()]);
+        // No usable %SystemRoot%: the default Windows folder.
+        let default = Path::new(r"C:\Windows").join("explorer.exe");
+        assert_eq!(windows_launch(app, Some(OsStr::new(""))).0, default);
+        assert_eq!(windows_launch(app, None).0, default);
+        // Explorer would split this path at the comma.
+        let comma = Path::new(r"C:\Apps, tools\photocraft.exe");
+        assert_eq!(windows_launch(comma, None), (comma.to_path_buf(), Vec::new()));
+    }
 }

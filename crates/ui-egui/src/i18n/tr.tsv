@@ -3882,7 +3882,7 @@ cameraData	Lens	Lens
 	Managed by the launch options (--control).	Başlatma seçenekleri tarafından yönetiliyor (--control).
 	Agents can connect on 127.0.0.1:{port}.	Ajanlar 127.0.0.1:{port} üzerinden bağlanabilir.
 	Off: agents can't connect.	Kapalı: ajanlar bağlanamaz.
-	0 picks a free port	0 boş bir bağlantı noktası seçer
+	0 picks a free port; AI apps find it by themselves	0 boş bir bağlantı noktası seçer; yapay zekâ uygulamaları onu kendileri bulur
 	Folder agents can open from	Ajanların açabileceği klasör
 	Folder agents can save to	Ajanların kaydedebileceği klasör
 	When PhotoCraft is closed	PhotoCraft kapalıyken

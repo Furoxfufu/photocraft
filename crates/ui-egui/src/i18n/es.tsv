@@ -2835,7 +2835,7 @@ curves	Smooth	Suavizar
 	Managed by the launch options (--control).	Gestionado por las opciones de inicio (--control).
 	Agents can connect on 127.0.0.1:{port}.	Los agentes pueden conectarse en 127.0.0.1:{port}.
 	Off: agents can't connect.	Desactivado: los agentes no pueden conectarse.
-	0 picks a free port	0 elige un puerto libre
+	0 picks a free port; AI apps find it by themselves	0 elige un puerto libre; las apps de IA lo encuentran solas
 	Folder agents can open from	Carpeta desde la que los agentes pueden abrir
 	Folder agents can save to	Carpeta en la que los agentes pueden guardar
 	When PhotoCraft is closed	Cuando PhotoCraft está cerrado

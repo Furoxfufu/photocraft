@@ -3152,7 +3152,7 @@ curves	Smooth	Lisser
 	Managed by the launch options (--control).	Géré par les options de lancement (--control).
 	Agents can connect on 127.0.0.1:{port}.	Les agents peuvent se connecter sur 127.0.0.1:{port}.
 	Off: agents can't connect.	Désactivé : les agents ne peuvent pas se connecter.
-	0 picks a free port	0 choisit un port libre
+	0 picks a free port; AI apps find it by themselves	0 choisit un port libre ; les applications d’IA le trouvent d’elles-mêmes
 	Folder agents can open from	Dossier où les agents peuvent ouvrir
 	Folder agents can save to	Dossier où les agents peuvent enregistrer
 	When PhotoCraft is closed	Quand PhotoCraft est fermé

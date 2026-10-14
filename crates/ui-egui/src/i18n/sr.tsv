@@ -4225,7 +4225,7 @@ shape	Appearance	Izgled
 	Managed by the launch options (--control).	Upravljaju opcije pokretanja (--control).
 	Agents can connect on 127.0.0.1:{port}.	Agenti mogu da se povežu na 127.0.0.1:{port}.
 	Off: agents can't connect.	Isključeno: agenti ne mogu da se povežu.
-	0 picks a free port	0 bira slobodan port
+	0 picks a free port; AI apps find it by themselves	0 bira slobodan port; AI aplikacije ga same pronalaze
 	Folder agents can open from	Fascikla iz koje agenti mogu da otvaraju
 	Folder agents can save to	Fascikla u koju agenti mogu da čuvaju
 	When PhotoCraft is closed	Kada je PhotoCraft zatvoren

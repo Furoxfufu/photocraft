@@ -4113,7 +4113,7 @@ navigator	Zoom	Zoom
 	Managed by the launch options (--control).	Gestito dalle opzioni di avvio (--control).
 	Agents can connect on 127.0.0.1:{port}.	Gli agenti possono connettersi su 127.0.0.1:{port}.
 	Off: agents can't connect.	Disattivato: gli agenti non possono connettersi.
-	0 picks a free port	0 sceglie una porta libera
+	0 picks a free port; AI apps find it by themselves	0 sceglie una porta libera; le app di IA la trovano da sole
 	Folder agents can open from	Cartella da cui gli agenti possono aprire
 	Folder agents can save to	Cartella in cui gli agenti possono salvare
 	When PhotoCraft is closed	Quando PhotoCraft è chiuso

@@ -4071,7 +4071,7 @@ cameraRaw	Yellow	Sárga
 	Managed by the launch options (--control).	Az indítási kapcsolók kezelik (--control).
 	Agents can connect on 127.0.0.1:{port}.	Az ügynökök a 127.0.0.1:{port} címen csatlakozhatnak.
 	Off: agents can't connect.	Ki: az ügynökök nem csatlakozhatnak.
-	0 picks a free port	0: szabad port választása
+	0 picks a free port; AI apps find it by themselves	0: szabad port választása; az AI-alkalmazások maguktól megtalálják
 	Folder agents can open from	Mappa, ahonnan az ügynökök megnyithatnak
 	Folder agents can save to	Mappa, ahová az ügynökök menthetnek
 	When PhotoCraft is closed	Ha a PhotoCraft be van zárva

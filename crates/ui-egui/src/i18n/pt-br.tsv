@@ -3940,7 +3940,7 @@ layerLabel	No Color	Sem cor
 	Managed by the launch options (--control).	Gerenciado pelas opções de inicialização (--control).
 	Agents can connect on 127.0.0.1:{port}.	Os agentes podem se conectar em 127.0.0.1:{port}.
 	Off: agents can't connect.	Desativado: os agentes não podem se conectar.
-	0 picks a free port	0 escolhe uma porta livre
+	0 picks a free port; AI apps find it by themselves	0 escolhe uma porta livre; os apps de IA a encontram sozinhos
 	Folder agents can open from	Pasta da qual os agentes podem abrir
 	Folder agents can save to	Pasta na qual os agentes podem salvar
 	When PhotoCraft is closed	Quando o PhotoCraft estiver fechado

@@ -2760,7 +2760,7 @@ curves	Smooth	平滑
 	Managed by the launch options (--control).	由启动选项管理 (--control)。
 	Agents can connect on 127.0.0.1:{port}.	代理可通过 127.0.0.1:{port} 连接。
 	Off: agents can't connect.	关闭：代理无法连接。
-	0 picks a free port	0 表示选择空闲端口
+	0 picks a free port; AI apps find it by themselves	0 表示选择空闲端口；AI 应用会自动找到它
 	Folder agents can open from	代理可打开的文件夹
 	Folder agents can save to	代理可保存到的文件夹
 	When PhotoCraft is closed	PhotoCraft 关闭时

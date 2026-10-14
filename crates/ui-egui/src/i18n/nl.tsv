@@ -3910,7 +3910,7 @@ curves	Smooth	Vloeiend maken
 	Managed by the launch options (--control).	Beheerd door de startopties (--control).
 	Agents can connect on 127.0.0.1:{port}.	Agents kunnen verbinden via 127.0.0.1:{port}.
 	Off: agents can't connect.	Uit: agents kunnen niet verbinden.
-	0 picks a free port	0 kiest een vrije poort
+	0 picks a free port; AI apps find it by themselves	0 kiest een vrije poort; AI-apps vinden die zelf
 	Folder agents can open from	Map waaruit agents mogen openen
 	Folder agents can save to	Map waarin agents mogen opslaan
 	When PhotoCraft is closed	Als PhotoCraft gesloten is

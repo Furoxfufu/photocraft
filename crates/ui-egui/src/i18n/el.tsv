@@ -3848,7 +3848,7 @@ curves	Smooth	Εξομάλυνση
 	Managed by the launch options (--control).	Διαχειρίζεται από τις επιλογές εκκίνησης (--control).
 	Agents can connect on 127.0.0.1:{port}.	Οι πράκτορες μπορούν να συνδεθούν στο 127.0.0.1:{port}.
 	Off: agents can't connect.	Ανενεργό: οι πράκτορες δεν μπορούν να συνδεθούν.
-	0 picks a free port	Το 0 επιλέγει μια ελεύθερη θύρα
+	0 picks a free port; AI apps find it by themselves	Το 0 επιλέγει μια ελεύθερη θύρα· οι εφαρμογές AI τη βρίσκουν μόνες τους
 	Folder agents can open from	Φάκελος από τον οποίο ανοίγουν οι πράκτορες
 	Folder agents can save to	Φάκελος όπου αποθηκεύουν οι πράκτορες
 	When PhotoCraft is closed	Όταν το PhotoCraft είναι κλειστό

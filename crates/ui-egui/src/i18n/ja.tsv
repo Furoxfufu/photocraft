@@ -3827,7 +3827,7 @@ curves	Smooth	スムーズ
 	Managed by the launch options (--control).	起動オプションで管理されています (--control)。
 	Agents can connect on 127.0.0.1:{port}.	エージェントは 127.0.0.1:{port} で接続できます。
 	Off: agents can't connect.	オフ：エージェントは接続できません。
-	0 picks a free port	0 で空いているポートを選択
+	0 picks a free port; AI apps find it by themselves	0 で空いているポートを選択（AI アプリが自動で見つけます）
 	Folder agents can open from	エージェントが開けるフォルダー
 	Folder agents can save to	エージェントが保存できるフォルダー
 	When PhotoCraft is closed	PhotoCraft が閉じているとき

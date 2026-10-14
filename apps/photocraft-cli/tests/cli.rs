@@ -759,6 +759,10 @@ fn mcp_install_writes_the_live_entry() {
     let entry = &v["mcpServers"]["photocraft"];
     assert_eq!(entry["args"], json!(["mcp", "--live"]), "{out}");
     assert!(entry["command"].as_str().unwrap().contains("photocraft-cli"), "{out}");
+    // Cursor never opened here: nothing is written, and the error says what to do.
+    let o = bin().args(["mcp", "install", "--client", "cursor"]).env("HOME", &home).env("USERPROFILE", &home).output().unwrap();
+    assert!(!o.status.success() && String::from_utf8_lossy(&o.stderr).contains("open it once"), "{o:?}");
+    assert!(!home.join(".cursor").exists());
     let cursor = home.join(".cursor/mcp.json");
     std::fs::create_dir_all(cursor.parent().unwrap()).unwrap();
     std::fs::write(&cursor, r#"{"mcpServers": {"other": {"command": "x"}}}"#).unwrap();

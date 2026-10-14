@@ -3325,7 +3325,7 @@ curves	Smooth	매끄럽게
 	Managed by the launch options (--control).	실행 옵션으로 관리됨 (--control).
 	Agents can connect on 127.0.0.1:{port}.	에이전트가 127.0.0.1:{port}에서 연결할 수 있습니다.
 	Off: agents can't connect.	끔: 에이전트가 연결할 수 없습니다.
-	0 picks a free port	0은 빈 포트를 선택
+	0 picks a free port; AI apps find it by themselves	0은 빈 포트를 선택 (AI 앱이 알아서 찾음)
 	Folder agents can open from	에이전트가 열 수 있는 폴더
 	Folder agents can save to	에이전트가 저장할 수 있는 폴더
 	When PhotoCraft is closed	PhotoCraft가 닫혀 있을 때

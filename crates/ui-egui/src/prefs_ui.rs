@@ -1320,7 +1320,7 @@ fn integration_rows(ui: &mut egui::Ui, obj: &mut Map<String, Value>, f: &mut Map
             let mut p = obj.get("controlPort").and_then(Value::as_i64).unwrap_or(0);
             ui.add(egui::DragValue::new(&mut p).range(0..=65535).custom_parser(crate::widgets::parse_num));
             obj.insert("controlPort".into(), json!(p));
-            ui.label(RichText::new(tl!("0 picks a free port")).color(t.text_faint));
+            ui.label(RichText::new(tl!("0 picks a free port; AI apps find it by themselves")).color(t.text_faint));
         });
         ui.end_row();
         for (key, pick) in [("readFolder", "chooseRead"), ("writeFolder", "chooseWrite")] {
@@ -1344,7 +1344,9 @@ fn integration_rows(ui: &mut egui::Ui, obj: &mut Map<String, Value>, f: &mut Map
         obj.insert("whenAppClosed".into(), json!(cur));
         ui.end_row();
     });
-    if f.get("__agentClients").and_then(Value::as_bool) == Some(true) {
+    // The buttons configure an AI app to connect, which only works once agents may: offer them
+    // with the box ticked (launch options manage the connection otherwise).
+    if on && !launch_flags && f.get("__agentClients").and_then(Value::as_bool) == Some(true) {
         ui.add_space(10.0);
         ui.label(RichText::new(tl!("Connect an AI app")).font(crate::theme::semibold(12.5)).color(t.text));
         ui.horizontal_wrapped(|ui| {
@@ -3030,6 +3032,41 @@ mod tests {
         assert_eq!(app.agent_link.port, None);
         // ui.inspect reports it.
         assert!(crate::control::inspect(&app, &ctx).get("agentLink").is_some());
+    }
+
+    /// The buttons that set up an AI app only show once agents may connect, and a click reaches
+    /// the service with the app's id and shows its answer.
+    #[test]
+    fn ai_integrations_offer_the_client_buttons_only_when_agents_may_connect() {
+        use egui_kittest::{Harness, kittest::Queryable};
+        let (mut app, _) = app_with_store();
+        let clicked: Arc<Mutex<Vec<String>>> = Arc::default();
+        let seen = clicked.clone();
+        app.services.agent_clients = Some(Box::new(move |id: &str| {
+            seen.lock().unwrap().push(id.to_string());
+            Ok(format!("Added PhotoCraft to {id}."))
+        }));
+        open_preferences(&mut app, "integrations");
+        let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).build_eframe(move |cc| {
+            PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+            app
+        });
+        h.run_steps(4);
+        assert!(h.query_by_label("Add to Claude Desktop").is_none(), "off: nothing to set up yet");
+        assert!(h.query_by_label("Copy Configuration").is_none());
+        h.get_by_label("Let AI agents connect (MCP)").click();
+        h.run_steps(3);
+        for label in ["Add to Claude Desktop", "Add to Claude Code", "Add to Cursor", "Copy Configuration"] {
+            assert!(h.query_by_label(label).is_some(), "{label}");
+        }
+        h.get_by_label("Add to Cursor").click();
+        h.run_steps(3);
+        assert_eq!(*clicked.lock().unwrap(), ["cursor"]);
+        assert!(h.query_by_label("Added PhotoCraft to cursor.").is_some(), "the answer is shown");
+        // Unticked again: the buttons go.
+        h.get_by_label("Let AI agents connect (MCP)").click();
+        h.run_steps(3);
+        assert!(h.query_by_label("Add to Cursor").is_none());
     }
 
     #[test]

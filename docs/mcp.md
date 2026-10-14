@@ -7,7 +7,8 @@
    happens when an agent needs PhotoCraft while it is closed (open it, work without a window,
    or ask the user to open it). Click **Apply** or **OK**.
 2. Click **Add to Claude Desktop**, **Add to Claude Code** or **Add to Cursor** (or **Copy
-   Configuration** for any other MCP client), then restart that client.
+   Configuration** for any other MCP client), then restart that client. The buttons show once
+   the box is ticked.
 
 The client then starts `photocraft-cli mcp --live`. The app listens on loopback (any free
 port by default) with a token it creates in its settings folder, and publishes both in
@@ -23,11 +24,32 @@ app's choice. In a headless session started that way, the folders chosen in the 
 session stays headless until the MCP client restarts it. The app is started only on a tool
 call, never when the MCP client starts, and only while **Let AI agents connect** is on.
 
-Claude Desktop's configuration is rewritten with its keys sorted; the previous file is kept beside
-it as `claude_desktop_config.json.photocraft-backup` (likewise Cursor's `mcp.json`). Claude Code
-is configured with `claude mcp add-json --scope user`. In the Flatpak, the sandbox can't write
-those files (use **Copy Configuration**), and the connection needs
+Where each client is configured:
+
+| Client | macOS | Windows | Linux |
+|---|---|---|---|
+| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` | `%APPDATA%\Claude\claude_desktop_config.json`; the Microsoft Store app reads `%LOCALAPPDATA%\Packages\Claude_<id>\LocalCache\Roaming\Claude\claude_desktop_config.json` instead | `$XDG_CONFIG_HOME` or `~/.config`, `Claude/claude_desktop_config.json` |
+| Cursor | `~/.cursor/mcp.json` | `%USERPROFILE%\.cursor\mcp.json` | `~/.cursor/mcp.json` |
+| Claude Code | `claude mcp add --scope user photocraft -- <cli> mcp --live` (stored in `~/.claude.json`) | same (`claude.exe`, or npm's `claude.cmd`) | same |
+
+A client is configured only where it has created its settings folder (it does when it first
+starts); otherwise the button says to install it and open it once, rather than writing a file
+nothing reads. On Windows both Claude Desktop files get the entry when both exist: the Store app
+reads its package's copy, while its **Edit Config** opens the other one
+([anthropics/claude-code#26073](https://github.com/anthropics/claude-code/issues/26073)). A JSON
+configuration is rewritten with its keys sorted; the previous file is kept beside it as
+`<name>.photocraft-backup`. Claude Code is found on `PATH`, else where its installers put it
+(`~/.local/bin`, `~/.claude/local`, Homebrew, `/usr/local/bin`, `%APPDATA%\npm`), and runs with
+its own folder first on `PATH` (an npm install needs the Node beside it); if it can't be run, the
+message gives the command to type. In the Flatpak, the sandbox can't write those files (use
+**Copy Configuration**), and the connection needs
 `flatpak override --user --share=network ai.storyteller.photocraft`.
+
+When `--live` starts the app, macOS goes through LaunchServices (`open -a`) and Windows through
+Explorer, as a double-click would: the app is no child of the CLI, so it keeps running when the
+MCP client ends the CLI's process tree (Claude Code does on Windows), and it stays out of a
+Microsoft Store client's container, where new files under `%APPDATA%` would land in the client's
+package instead of PhotoCraft's settings folder. Linux starts it in its own process group.
 
 ## Headless sessions
 

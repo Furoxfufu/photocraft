@@ -3637,7 +3637,7 @@ curves	Smooth	Làm mượt
 	Managed by the launch options (--control).	Do tùy chọn khởi chạy quản lý (--control).
 	Agents can connect on 127.0.0.1:{port}.	Tác tử có thể kết nối tại 127.0.0.1:{port}.
 	Off: agents can't connect.	Tắt: tác tử không thể kết nối.
-	0 picks a free port	0 chọn một cổng trống
+	0 picks a free port; AI apps find it by themselves	0 chọn một cổng trống; ứng dụng AI tự tìm thấy cổng
 	Folder agents can open from	Thư mục tác tử có thể mở
 	Folder agents can save to	Thư mục tác tử có thể lưu vào
 	When PhotoCraft is closed	Khi PhotoCraft đang đóng

@@ -228,72 +228,176 @@ pub struct ClientEnv {
     pub home: Option<PathBuf>,
     /// `%APPDATA%` (Windows).
     pub appdata: Option<PathBuf>,
+    /// `%LOCALAPPDATA%` (Windows): Microsoft Store (MSIX) installs keep their settings in
+    /// `Packages` there.
+    pub local_appdata: Option<PathBuf>,
     /// `$XDG_CONFIG_HOME` (Linux).
     pub xdg_config: Option<PathBuf>,
     /// `$PATH`, searched for the `claude` command.
     pub path: Option<std::ffi::OsString>,
 }
 
+/// The platform whose settings locations apply: a parameter, so tests cover all three.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Platform {
+    Mac,
+    Windows,
+    Other,
+}
+
+impl Platform {
+    const CURRENT: Platform = if cfg!(target_os = "macos") {
+        Platform::Mac
+    } else if cfg!(windows) {
+        Platform::Windows
+    } else {
+        Platform::Other
+    };
+}
+
+/// Where one install of a client keeps its MCP servers: `file`, in `folder`, which the client
+/// creates when it first starts (so a missing folder means the client isn't set up there).
+struct Location {
+    folder: PathBuf,
+    file: PathBuf,
+}
+
+const CLAUDE_DESKTOP_CONFIG: &str = "claude_desktop_config.json";
+
+/// Microsoft Store (MSIX) packages of Claude Desktop, by folder-name prefix in
+/// `%LOCALAPPDATA%\Packages`. Windows redirects a packaged app's `%APPDATA%` into its package
+/// (`LocalCache\Roaming`), so such an install reads its configuration there and never sees
+/// `%APPDATA%\Claude`.
+const CLAUDE_PACKAGE_PREFIXES: [&str; 2] = ["Claude_", "Anthropic.Claude"];
+
 impl ClientEnv {
     pub fn from_env() -> Self {
         let var = |k: &str| std::env::var_os(k).filter(|v| !v.is_empty());
         ClientEnv {
-            home: var("HOME").or_else(|| var("USERPROFILE")).map(PathBuf::from),
+            // Windows apps (Cursor, Claude) use the profile folder; `HOME` there is often a Unix
+            // shell's (Git Bash, MSYS) and can point elsewhere.
+            home: if cfg!(windows) { var("USERPROFILE").or_else(|| var("HOME")) } else { var("HOME").or_else(|| var("USERPROFILE")) }.map(PathBuf::from),
             appdata: var("APPDATA").map(PathBuf::from),
+            local_appdata: var("LOCALAPPDATA").map(PathBuf::from),
             xdg_config: var("XDG_CONFIG_HOME").map(PathBuf::from),
             path: var("PATH"),
         }
     }
 
-    /// Where `client` keeps its MCP servers in a JSON file (`None` for Claude Code, which is
-    /// configured through its own command, and for [`Client::Json`]).
-    pub fn config_file(&self, client: Client) -> Option<PathBuf> {
-        match client {
-            Client::ClaudeDesktop if cfg!(target_os = "macos") => {
-                self.home.as_ref().map(|h| h.join("Library/Application Support/Claude/claude_desktop_config.json"))
+    /// The JSON files `client`'s installs on this computer read their MCP servers from (empty for
+    /// Claude Code, which is configured through its own command, for [`Client::Json`], and when
+    /// the client isn't set up here).
+    pub fn config_files(&self, client: Client) -> Vec<PathBuf> {
+        self.config_files_on(client, Platform::CURRENT)
+    }
+
+    fn config_files_on(&self, client: Client, platform: Platform) -> Vec<PathBuf> {
+        self.locations(client, platform).into_iter().filter(|l| l.folder.is_dir()).map(|l| l.file).collect()
+    }
+
+    fn locations(&self, client: Client, platform: Platform) -> Vec<Location> {
+        let at = |folder: PathBuf, name: &str| Location { file: folder.join(name), folder };
+        match (client, platform) {
+            (Client::ClaudeDesktop, Platform::Mac) => {
+                self.home.iter().map(|h| at(h.join("Library").join("Application Support").join("Claude"), CLAUDE_DESKTOP_CONFIG)).collect()
             }
-            Client::ClaudeDesktop if cfg!(windows) => self.appdata.as_ref().map(|a| a.join("Claude").join("claude_desktop_config.json")),
-            Client::ClaudeDesktop => {
-                self.xdg_config.clone().or_else(|| self.home.as_ref().map(|h| h.join(".config"))).map(|c| c.join("Claude").join("claude_desktop_config.json"))
+            (Client::ClaudeDesktop, Platform::Windows) => {
+                let packaged = self
+                    .claude_packages()
+                    .into_iter()
+                    .map(|package| Location { file: package.join("LocalCache").join("Roaming").join("Claude").join(CLAUDE_DESKTOP_CONFIG), folder: package });
+                packaged.chain(self.appdata.iter().map(|a| at(a.join("Claude"), CLAUDE_DESKTOP_CONFIG))).collect()
             }
-            Client::Cursor => self.home.as_ref().map(|h| h.join(".cursor").join("mcp.json")),
-            Client::ClaudeCode | Client::Json => None,
+            (Client::ClaudeDesktop, Platform::Other) => self
+                .xdg_config
+                .clone()
+                .or_else(|| self.home.as_ref().map(|h| h.join(".config")))
+                .into_iter()
+                .map(|c| at(c.join("Claude"), CLAUDE_DESKTOP_CONFIG))
+                .collect(),
+            (Client::Cursor, _) => self.home.iter().map(|h| at(h.join(".cursor"), "mcp.json")).collect(),
+            (Client::ClaudeCode | Client::Json, _) => Vec::new(),
         }
+    }
+
+    /// Claude Desktop's Microsoft Store packages ([`CLAUDE_PACKAGE_PREFIXES`]).
+    fn claude_packages(&self) -> Vec<PathBuf> {
+        let Some(packages) = self.local_appdata.as_ref().map(|l| l.join("Packages")) else { return Vec::new() };
+        let Ok(entries) = std::fs::read_dir(packages) else { return Vec::new() };
+        let mut found: Vec<PathBuf> = entries
+            .flatten()
+            .filter(|e| CLAUDE_PACKAGE_PREFIXES.iter().any(|p| e.file_name().to_string_lossy().starts_with(p)))
+            .map(|e| e.path())
+            .filter(|p| p.is_dir())
+            .collect();
+        found.sort();
+        found
     }
 
     /// The `claude` command: on `PATH`, else where its installers put it (an app started from
     /// the Dock or Start menu has a minimal `PATH`).
     pub fn claude_command(&self) -> Option<PathBuf> {
-        let exe = if cfg!(windows) { "claude.exe" } else { "claude" };
-        let on_path = self.path.iter().flat_map(std::env::split_paths).map(|d| d.join(exe));
-        let known = self.home.iter().flat_map(|h| [h.join(".local/bin").join(exe), h.join(".claude/local").join(exe)]);
-        let system = ["/opt/homebrew/bin/claude", "/usr/local/bin/claude"].map(PathBuf::from).into_iter().filter(|_| !cfg!(windows));
-        on_path.chain(known).chain(system).find(|p| p.is_file())
+        self.claude_command_on(Platform::CURRENT)
+    }
+
+    fn claude_command_on(&self, platform: Platform) -> Option<PathBuf> {
+        // Windows: the native installer's `claude.exe`, or npm's `claude.cmd` script.
+        let names: &[&str] = if platform == Platform::Windows { &["claude.exe", "claude.cmd"] } else { &["claude"] };
+        let on_path: Vec<PathBuf> = self.path.iter().flat_map(std::env::split_paths).flat_map(|d| names.iter().map(move |n| d.join(n))).collect();
+        let mut known: Vec<PathBuf> = Vec::new();
+        if let Some(h) = &self.home {
+            let native = h.join(".local").join("bin");
+            known.extend(names.iter().map(|n| native.join(n)));
+            known.push(h.join(".claude").join("local").join(names[0]));
+        }
+        if platform == Platform::Windows {
+            known.extend(self.appdata.iter().map(|a| a.join("npm").join("claude.cmd")));
+        } else {
+            known.extend(["/opt/homebrew/bin/claude", "/usr/local/bin/claude"].map(PathBuf::from));
+        }
+        on_path.into_iter().chain(known).find(|p| p.is_file())
     }
 }
 
 /// What [`install`] did, for the user.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Installed {
-    /// Wrote `file` (the previous version is kept beside it as `backup`).
-    File { file: PathBuf, backup: Option<PathBuf>, unchanged: bool },
-    /// Ran `claude mcp add-json`.
+    /// Wrote the configuration of each install of the client found (Claude Desktop on Windows
+    /// can have a Microsoft Store one and a classic one).
+    Files(Vec<Written>),
+    /// Ran `claude mcp add`.
     ClaudeCode,
     /// The configuration to paste.
     Json(String),
+}
+
+/// One configuration file [`install`] wrote.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Written {
+    pub file: PathBuf,
+    /// The previous version, kept beside it.
+    pub backup: Option<PathBuf>,
+    /// It already started PhotoCraft this way, so it was left alone.
+    pub unchanged: bool,
 }
 
 impl Installed {
     /// One sentence for a status line or the terminal.
     pub fn message(&self, client: Client) -> String {
         let restart = match client {
-            Client::ClaudeDesktop => " Restart Claude Desktop to connect.",
-            Client::Cursor => " Cursor picks it up in Settings › MCP.",
+            Client::ClaudeDesktop => " Quit Claude Desktop completely (not just its window) and open it again to connect.",
+            Client::Cursor => " Restart Cursor to connect; PhotoCraft then shows under Customize › MCPs.",
             _ => "",
         };
         match self {
-            Installed::File { file, unchanged: true, .. } => format!("{} already starts PhotoCraft ({}).{restart}", client.name(), file.display()),
-            Installed::File { file, .. } => format!("Added PhotoCraft to {} ({}).{restart}", client.name(), file.display()),
+            Installed::Files(files) => {
+                let list = files.iter().map(|w| w.file.display().to_string()).collect::<Vec<_>>().join("; ");
+                if files.iter().all(|w| w.unchanged) {
+                    format!("{} already starts PhotoCraft ({list}).{restart}", client.name())
+                } else {
+                    format!("Added PhotoCraft to {} ({list}).{restart}", client.name())
+                }
+            }
             Installed::ClaudeCode => "Added PhotoCraft to Claude Code (user scope). Start a new Claude Code session to connect.".into(),
             Installed::Json(text) => text.clone(),
         }
@@ -303,19 +407,35 @@ impl Installed {
 /// Add PhotoCraft (started by `launch`) to `client`'s MCP servers, replacing an older
 /// `photocraft` entry and keeping everything else in its configuration.
 pub fn install(client: Client, launch: &McpLaunch, env: &ClientEnv) -> Result<Installed, AutomationError> {
+    install_on(client, launch, env, Platform::CURRENT)
+}
+
+fn install_on(client: Client, launch: &McpLaunch, env: &ClientEnv, platform: Platform) -> Result<Installed, AutomationError> {
     match client {
         Client::Json => Ok(Installed::Json(launch.config_json())),
         Client::ClaudeCode => install_claude_code(launch, env),
         Client::ClaudeDesktop | Client::Cursor => {
-            let file =
-                env.config_file(client).ok_or_else(|| AutomationError::Other(format!("can't find {}'s settings folder (no home folder)", client.name())))?;
-            merge_into_file(&file, launch)
+            let files = env.config_files_on(client, platform);
+            if files.is_empty() {
+                return Err(not_set_up(client, &env.locations(client, platform)));
+            }
+            files.iter().map(|file| merge_into_file(file, launch)).collect::<Result<_, _>>().map(Installed::Files)
         }
     }
 }
 
+/// No install of `client` found: writing a configuration nobody reads would look like success.
+fn not_set_up(client: Client, looked: &[Location]) -> AutomationError {
+    let name = client.name();
+    if looked.is_empty() {
+        return AutomationError::Other(format!("can't find {name}'s settings folder (no home folder)"));
+    }
+    let folders = looked.iter().map(|l| l.folder.display().to_string()).collect::<Vec<_>>().join(" or ");
+    AutomationError::Other(format!("{name} isn't set up on this computer (no {folders} folder): install it and open it once, then try again"))
+}
+
 /// Merge the `photocraft` entry into a JSON configuration with an `mcpServers` object.
-fn merge_into_file(file: &Path, launch: &McpLaunch) -> Result<Installed, AutomationError> {
+fn merge_into_file(file: &Path, launch: &McpLaunch) -> Result<Written, AutomationError> {
     let existing = read_small(file)?;
     let mut root = match existing.as_deref().map(str::trim) {
         None | Some("") => Map::new(),
@@ -331,7 +451,7 @@ fn merge_into_file(file: &Path, launch: &McpLaunch) -> Result<Installed, Automat
     };
     let entry = launch.entry();
     if servers.get(SERVER_NAME) == Some(&entry) {
-        return Ok(Installed::File { file: file.to_path_buf(), backup: None, unchanged: true });
+        return Ok(Written { file: file.to_path_buf(), backup: None, unchanged: true });
     }
     servers.insert(SERVER_NAME.into(), entry);
     let text = serde_json::to_string_pretty(&Value::Object(root)).map_err(|e| AutomationError::Other(e.to_string()))?;
@@ -350,33 +470,34 @@ fn merge_into_file(file: &Path, launch: &McpLaunch) -> Result<Installed, Automat
         None => None,
     };
     photocraft_format::atomic_write(file, format!("{text}\n").as_bytes()).map_err(|e| io_error(file, e))?;
-    Ok(Installed::File { file: file.to_path_buf(), backup, unchanged: false })
+    Ok(Written { file: file.to_path_buf(), backup, unchanged: false })
 }
 
 fn install_claude_code(launch: &McpLaunch, env: &ClientEnv) -> Result<Installed, AutomationError> {
-    let claude = env.claude_command().ok_or_else(|| {
-        AutomationError::Other(format!(
-            "the `claude` command wasn't found; run this in a terminal instead: claude mcp add --scope user {SERVER_NAME} -- {}",
-            launch.shell_line()
-        ))
-    })?;
-    let entry = json!({"type": "stdio", "command": launch.command, "args": launch.args});
+    let by_hand = format!("claude mcp add --scope user {SERVER_NAME} -- {}", launch.shell_line());
+    let claude =
+        env.claude_command().ok_or_else(|| AutomationError::Other(format!("the `claude` command wasn't found; run this in a terminal instead: {by_hand}")))?;
+    // npm installs `claude` as a Node script, and Node sits beside it (nvm, Homebrew): put that
+    // folder first on `PATH`, which is minimal for an app started from the Dock or Start menu.
+    let path = std::env::join_paths(claude.parent().map(Path::to_path_buf).into_iter().chain(env.path.iter().flat_map(std::env::split_paths))).ok();
     let run = |args: &[&str]| {
-        std::process::Command::new(&claude)
-            .args(args)
-            .stdin(std::process::Stdio::null())
-            .output()
-            .map_err(|e| AutomationError::Other(format!("{}: {e}", claude.display())))
+        let mut c = std::process::Command::new(&claude);
+        c.args(args).stdin(std::process::Stdio::null());
+        if let Some(p) = &path {
+            c.env("PATH", p);
+        }
+        c.output()
     };
-    // `add-json` refuses a name that exists: replace an older entry (ours, by name).
+    // `add` refuses a name that exists: replace an older entry (ours, by name).
     let _ = run(&["mcp", "remove", "--scope", "user", SERVER_NAME]);
-    let out = run(&["mcp", "add-json", "--scope", "user", SERVER_NAME, &entry.to_string()])?;
-    if out.status.success() {
-        Ok(Installed::ClaudeCode)
-    } else {
-        let why = String::from_utf8_lossy(if out.stderr.is_empty() { &out.stdout } else { &out.stderr }).trim().to_string();
-        Err(AutomationError::Other(format!("claude mcp add-json failed: {why}")))
-    }
+    let mut add = vec!["mcp", "add", "--scope", "user", SERVER_NAME, "--", launch.command.as_str()];
+    add.extend(launch.args.iter().map(String::as_str));
+    let why = match run(&add) {
+        Ok(out) if out.status.success() => return Ok(Installed::ClaudeCode),
+        Ok(out) => String::from_utf8_lossy(if out.stderr.is_empty() { &out.stdout } else { &out.stderr }).trim().to_string(),
+        Err(e) => format!("{}: {e}", claude.display()),
+    };
+    Err(AutomationError::Other(format!("adding PhotoCraft to Claude Code failed ({why}); run this in a terminal instead: {by_hand}")))
 }
 
 #[cfg(test)]
@@ -393,7 +514,13 @@ mod tests {
     }
 
     fn env_at(home: &Path) -> ClientEnv {
-        ClientEnv { home: Some(home.to_path_buf()), appdata: Some(home.join("AppData")), xdg_config: None, path: None }
+        ClientEnv {
+            home: Some(home.to_path_buf()),
+            appdata: Some(home.join("AppData").join("Roaming")),
+            local_appdata: Some(home.join("AppData").join("Local")),
+            xdg_config: None,
+            path: None,
+        }
     }
 
     #[test]
@@ -479,30 +606,84 @@ mod tests {
 
     #[test]
     fn install_adds_the_entry_and_keeps_other_servers_and_settings() {
-        let home = temp("install");
-        let env = env_at(&home);
         let launch = McpLaunch::cli(Path::new("/opt/PhotoCraft/photocraft-cli"));
-        for client in [Client::ClaudeDesktop, Client::Cursor] {
-            let file = env.config_file(client).unwrap();
-            assert!(file.starts_with(&home), "{}", file.display());
-            // A fresh install creates the file.
-            let first = install(client, &launch, &env).unwrap();
-            assert_eq!(first, Installed::File { file: file.clone(), backup: None, unchanged: false });
-            let v: Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
-            assert_eq!(v["mcpServers"]["photocraft"], launch.entry());
-            // Other servers and settings survive; an old photocraft entry is replaced.
-            std::fs::write(&file, r#"{"theme": "dark", "mcpServers": {"other": {"command": "x"}, "photocraft": {"command": "old"}}}"#).unwrap();
-            let again = install(client, &launch, &env).unwrap();
-            let Installed::File { backup: Some(backup), unchanged: false, .. } = &again else { panic!("{again:?}") };
-            assert!(std::fs::read_to_string(backup).unwrap().contains("\"old\""), "the previous file is kept");
-            let v: Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
-            assert_eq!(v["theme"], "dark");
-            assert_eq!(v["mcpServers"]["other"]["command"], "x");
-            assert_eq!(v["mcpServers"]["photocraft"], launch.entry());
-            // Installing again changes nothing.
-            assert!(matches!(install(client, &launch, &env).unwrap(), Installed::File { unchanged: true, .. }));
-            assert!(again.message(client).contains(client.name()));
+        for platform in [Platform::Mac, Platform::Windows, Platform::Other] {
+            for client in [Client::ClaudeDesktop, Client::Cursor] {
+                let home = temp("install");
+                let env = env_at(&home);
+                let [location] = &env.locations(client, platform)[..] else { panic!("{client:?} on {platform:?}") };
+                let file = location.file.clone();
+                assert!(file.starts_with(&home), "{}", file.display());
+                // The client created its folder when it first started; a fresh install creates the file.
+                std::fs::create_dir_all(&location.folder).unwrap();
+                let first = install_on(client, &launch, &env, platform).unwrap();
+                assert_eq!(first, Installed::Files(vec![Written { file: file.clone(), backup: None, unchanged: false }]));
+                let v: Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+                assert_eq!(v["mcpServers"]["photocraft"], launch.entry());
+                // Other servers and settings survive; an old photocraft entry is replaced.
+                std::fs::write(&file, r#"{"theme": "dark", "mcpServers": {"other": {"command": "x"}, "photocraft": {"command": "old"}}}"#).unwrap();
+                let again = install_on(client, &launch, &env, platform).unwrap();
+                let Installed::Files(written) = &again else { panic!("{again:?}") };
+                let [Written { backup: Some(backup), unchanged: false, .. }] = &written[..] else { panic!("{again:?}") };
+                assert!(std::fs::read_to_string(backup).unwrap().contains("\"old\""), "the previous file is kept");
+                let v: Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+                assert_eq!(v["theme"], "dark");
+                assert_eq!(v["mcpServers"]["other"]["command"], "x");
+                assert_eq!(v["mcpServers"]["photocraft"], launch.entry());
+                // Installing again changes nothing.
+                let same = install_on(client, &launch, &env, platform).unwrap();
+                assert!(matches!(&same, Installed::Files(w) if w.iter().all(|w| w.unchanged)), "{same:?}");
+                assert!(again.message(client).contains(client.name()));
+                assert!(same.message(client).contains("already"));
+                let _ = std::fs::remove_dir_all(&home);
+            }
         }
+    }
+
+    #[test]
+    fn a_client_that_was_never_opened_gets_no_file_and_an_explanation() {
+        let launch = McpLaunch::cli(Path::new("/x/photocraft-cli"));
+        for platform in [Platform::Mac, Platform::Windows, Platform::Other] {
+            for client in [Client::ClaudeDesktop, Client::Cursor] {
+                let home = temp("not-set-up");
+                let env = env_at(&home);
+                let e = install_on(client, &launch, &env, platform).unwrap_err().to_string();
+                assert!(e.contains(client.name()) && e.contains("open it once"), "{e}");
+                assert!(env.locations(client, platform).iter().all(|l| e.contains(&l.folder.display().to_string()) && !l.file.exists()), "{e}");
+                let _ = std::fs::remove_dir_all(&home);
+            }
+        }
+    }
+
+    /// Claude Desktop from the Microsoft Store reads `%APPDATA%` inside its package
+    /// (anthropics/claude-code#26073), so the entry goes there, and to a classic install too.
+    #[test]
+    fn claude_desktop_from_the_microsoft_store_gets_the_entry_in_its_package() {
+        let home = temp("msix");
+        let env = env_at(&home);
+        let launch = McpLaunch::cli(Path::new("C:/PhotoCraft/photocraft-cli.exe"));
+        let packages = home.join("AppData").join("Local").join("Packages");
+        let store = packages.join("Claude_pzs8sxrjxfjjc");
+        std::fs::create_dir_all(&store).unwrap();
+        std::fs::create_dir_all(packages.join("Microsoft.WindowsCalculator_8wekyb3d8bbwe")).unwrap();
+        let packaged = store.join("LocalCache").join("Roaming").join("Claude").join(CLAUDE_DESKTOP_CONFIG);
+        let classic = home.join("AppData").join("Roaming").join("Claude").join(CLAUDE_DESKTOP_CONFIG);
+        // Installed from the Store and never opened: the package is enough to know where it reads.
+        assert_eq!(env.config_files_on(Client::ClaudeDesktop, Platform::Windows), std::slice::from_ref(&packaged));
+        let done = install_on(Client::ClaudeDesktop, &launch, &env, Platform::Windows).unwrap();
+        assert_eq!(done, Installed::Files(vec![Written { file: packaged.clone(), backup: None, unchanged: false }]));
+        assert!(!classic.exists(), "no file where this install never looks");
+        let v: Value = serde_json::from_str(&std::fs::read_to_string(&packaged).unwrap()).unwrap();
+        assert_eq!(v["mcpServers"]["photocraft"], launch.entry());
+        // A classic install as well (or Claude's own Edit Config file): both get the entry.
+        std::fs::create_dir_all(classic.parent().unwrap()).unwrap();
+        let both = install_on(Client::ClaudeDesktop, &launch, &env, Platform::Windows).unwrap();
+        let Installed::Files(written) = &both else { panic!("{both:?}") };
+        assert_eq!(written.iter().map(|w| (w.file.clone(), w.unchanged)).collect::<Vec<_>>(), [(packaged.clone(), true), (classic.clone(), false)]);
+        let message = both.message(Client::ClaudeDesktop);
+        assert!(message.contains(&packaged.display().to_string()) && message.contains(&classic.display().to_string()), "{message}");
+        // Other platforms never look in Packages.
+        assert!(env.config_files_on(Client::ClaudeDesktop, Platform::Other).is_empty());
         let _ = std::fs::remove_dir_all(&home);
     }
 
@@ -511,7 +692,7 @@ mod tests {
         let home = temp("install-bad");
         let env = env_at(&home);
         let launch = McpLaunch::cli(Path::new("/x/photocraft-cli"));
-        let file = env.config_file(Client::Cursor).unwrap();
+        let file = home.join(".cursor").join("mcp.json");
         std::fs::create_dir_all(file.parent().unwrap()).unwrap();
         for text in ["{ broken", "[1, 2]", r#"{"mcpServers": []}"#] {
             std::fs::write(&file, text).unwrap();
@@ -525,7 +706,7 @@ mod tests {
     #[test]
     fn claude_code_without_the_claude_command_names_the_command_to_run() {
         let home = temp("claude-code");
-        let env = ClientEnv { home: Some(home.clone()), appdata: None, xdg_config: None, path: Some(home.join("empty").into_os_string()) };
+        let env = ClientEnv { path: Some(home.join("empty").into_os_string()), ..env_at(&home) };
         if env.claude_command().is_some() {
             return; // A system-wide `claude` (Homebrew, /usr/local) is installed here.
         }
@@ -535,9 +716,76 @@ mod tests {
     }
 
     #[test]
+    fn claude_command_is_found_where_its_installers_put_it() {
+        let home = temp("claude-find");
+        let env = ClientEnv { path: Some(home.join("empty").into_os_string()), ..env_at(&home) };
+        let place = |p: PathBuf| {
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(&p, "").unwrap();
+            p
+        };
+        assert_eq!(env.claude_command_on(Platform::Windows), None);
+        // npm on Windows: a `claude.cmd` script in %APPDATA%\npm.
+        let npm = place(home.join("AppData").join("Roaming").join("npm").join("claude.cmd"));
+        assert_eq!(env.claude_command_on(Platform::Windows), Some(npm));
+        // The native installer wins over npm, on every platform.
+        let native = place(home.join(".local").join("bin").join("claude.exe"));
+        assert_eq!(env.claude_command_on(Platform::Windows), Some(native));
+        let unix = place(home.join(".local").join("bin").join("claude"));
+        assert_eq!(env.claude_command_on(Platform::Mac), Some(unix));
+        // `PATH` first.
+        let on_path = place(home.join("tools").join("claude.cmd"));
+        let env = ClientEnv { path: Some(home.join("tools").into_os_string()), ..env_at(&home) };
+        assert_eq!(env.claude_command_on(Platform::Windows), Some(on_path));
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    /// A fake `claude` records what it was run with: `mcp add` with the launch command after
+    /// `--`, and its own folder first on `PATH` (where npm's Node is).
+    #[cfg(unix)]
+    #[test]
+    fn claude_code_install_runs_claude_mcp_add() {
+        use std::os::unix::fs::PermissionsExt;
+        let home = temp("claude-run");
+        let bin = home.join(".local").join("bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        let log = home.join("calls.txt");
+        let fail = home.join("fail");
+        let script = format!(
+            "#!/bin/sh\nprintf 'PATH=%s\\n' \"$PATH\" >> '{log}'\nprintf '%s ' \"$@\" >> '{log}'\nprintf '\\n' >> '{log}'\nif [ \"$2\" = add ] && [ -e '{fail}' ]; then echo 'boom' >&2; exit 1; fi\n",
+            log = log.display(),
+            fail = fail.display()
+        );
+        let claude = bin.join("claude");
+        std::fs::write(&claude, script).unwrap();
+        std::fs::set_permissions(&claude, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let env = ClientEnv { path: Some(home.join("empty").into_os_string()), ..env_at(&home) };
+        let launch = McpLaunch::cli(Path::new("/x/photocraft-cli"));
+        // Writing an executable while other test threads fork can briefly leave it busy (ETXTBSY).
+        let run = || {
+            for _ in 0..50 {
+                match install(Client::ClaudeCode, &launch, &env) {
+                    Err(e) if e.to_string().contains("busy") => std::thread::sleep(std::time::Duration::from_millis(20)),
+                    r => return r,
+                }
+            }
+            install(Client::ClaudeCode, &launch, &env)
+        };
+        assert_eq!(run().unwrap(), Installed::ClaudeCode);
+        let calls = std::fs::read_to_string(&log).unwrap();
+        assert!(calls.contains("mcp remove --scope user photocraft \n"), "{calls}");
+        assert!(calls.contains("mcp add --scope user photocraft -- /x/photocraft-cli mcp --live \n"), "{calls}");
+        assert!(calls.contains(&format!("PATH={}:", bin.display())), "claude's folder comes first: {calls}");
+        std::fs::write(&fail, "").unwrap();
+        let e = run().unwrap_err().to_string();
+        assert!(e.contains("boom") && e.contains("claude mcp add --scope user photocraft -- /x/photocraft-cli mcp --live"), "{e}");
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
     fn json_client_returns_the_configuration() {
         let launch = McpLaunch::cli(Path::new("/x/photocraft-cli"));
-        let env = ClientEnv { home: None, appdata: None, xdg_config: None, path: None };
+        let env = ClientEnv { home: None, appdata: None, local_appdata: None, xdg_config: None, path: None };
         let Installed::Json(text) = install(Client::Json, &launch, &env).unwrap() else { panic!() };
         assert_eq!(text, launch.config_json());
         assert!(install(Client::Cursor, &launch, &env).is_err(), "no home folder: an error, not a panic");

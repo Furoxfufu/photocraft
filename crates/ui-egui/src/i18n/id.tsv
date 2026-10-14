@@ -3139,7 +3139,7 @@ curves	Smooth	Haluskan
 	Managed by the launch options (--control).	Dikelola oleh opsi peluncuran (--control).
 	Agents can connect on 127.0.0.1:{port}.	Agen dapat terhubung di 127.0.0.1:{port}.
 	Off: agents can't connect.	Mati: agen tidak dapat terhubung.
-	0 picks a free port	0 memilih port yang bebas
+	0 picks a free port; AI apps find it by themselves	0 memilih port yang bebas; aplikasi AI menemukannya sendiri
 	Folder agents can open from	Folder tempat agen dapat membuka
 	Folder agents can save to	Folder tempat agen dapat menyimpan
 	When PhotoCraft is closed	Saat PhotoCraft ditutup

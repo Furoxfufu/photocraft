@@ -3758,7 +3758,7 @@ navigator	Zoom	Zvětšení
 	Managed by the launch options (--control).	Spravováno parametry spuštění (--control).
 	Agents can connect on 127.0.0.1:{port}.	Agenti se mohou připojit na 127.0.0.1:{port}.
 	Off: agents can't connect.	Vypnuto: agenti se nemohou připojit.
-	0 picks a free port	0 zvolí volný port
+	0 picks a free port; AI apps find it by themselves	0 zvolí volný port; aplikace AI si ho najdou samy
 	Folder agents can open from	Složka, ze které mohou agenti otevírat
 	Folder agents can save to	Složka, do které mohou agenti ukládat
 	When PhotoCraft is closed	Když je PhotoCraft zavřený

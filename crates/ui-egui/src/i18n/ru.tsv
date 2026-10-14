@@ -3116,7 +3116,7 @@ curves	Smooth	Сгладить
 	Managed by the launch options (--control).	Управляется параметрами запуска (--control).
 	Agents can connect on 127.0.0.1:{port}.	Агенты могут подключаться к 127.0.0.1:{port}.
 	Off: agents can't connect.	Выключено: агенты не могут подключаться.
-	0 picks a free port	0 — выбрать свободный порт
+	0 picks a free port; AI apps find it by themselves	0 — выбрать свободный порт; ИИ-приложения найдут его сами
 	Folder agents can open from	Папка, из которой агенты могут открывать
 	Folder agents can save to	Папка, в которую агенты могут сохранять
 	When PhotoCraft is closed	Когда PhotoCraft закрыт
